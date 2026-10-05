@@ -1,0 +1,6 @@
+{
+  "name": "منظومة الروضة الشريفة لتحويلات إنستا باي",
+  "description": "منظومة شركة الروضة الشريفة لمتابعة ومطابقة تحويلات إنستا باي بين المحلات والمخازن والإدارة المالية.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
