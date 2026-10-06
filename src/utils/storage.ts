@@ -121,96 +121,7 @@ export const SAMPLE_RECEIPT_1 = '/src/assets/images/instapay_sample_receipt_1791
 export const SAMPLE_RECEIPT_2 = '/src/assets/images/instapay_sample_receipt_two_1791231126875.jpg';
 export const SAMPLE_INVOICE = '/src/assets/images/paper_invoice_receipt_1791231743153.jpg';
 
-export const INITIAL_TRANSFERS: TransferItem[] = [
-  {
-    id: 'tx_101',
-    branchName: 'محل الروضة الشريفة',
-    branchId: 'b_rawda',
-    invoiceNo: 'طلب #4401',
-    amount: 2450.00,
-    screenshotUrl: SAMPLE_RECEIPT_1,
-    images: [SAMPLE_INVOICE, SAMPLE_RECEIPT_1],
-    status: 'pending',
-    referenceNo: 'IP20261005882194',
-    senderName: 'طارق حسام عبد الرحمن',
-    senderIpaOrPhone: 'tarek.hossam@instapay',
-    cashierName: 'كاشير الروضة الشريفة',
-    createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-    bankAccountUsed: 'alrawda.store@instapay',
-    customerPhone: '01099234567',
-  },
-  {
-    id: 'tx_102',
-    branchName: 'محل صفا مكرم',
-    branchId: 'b_safa',
-    invoiceNo: 'طلب #4402',
-    amount: 850.00,
-    screenshotUrl: SAMPLE_RECEIPT_2,
-    images: [SAMPLE_INVOICE, SAMPLE_RECEIPT_2],
-    status: 'pending',
-    referenceNo: 'IP20261005771029',
-    senderName: 'مينا كمال غطاس',
-    senderIpaOrPhone: '01288334455',
-    cashierName: 'كاشير صفا مكرم',
-    createdAt: new Date(Date.now() - 1000 * 60 * 28).toISOString(),
-    bankAccountUsed: 'alrawda.pos@instapay',
-    customerPhone: '01288334455',
-  },
-  {
-    id: 'tx_103',
-    branchName: 'محل مودرن',
-    branchId: 'b_modern',
-    invoiceNo: 'طلب #4398',
-    amount: 4720.50,
-    screenshotUrl: SAMPLE_RECEIPT_1,
-    images: [SAMPLE_INVOICE, SAMPLE_RECEIPT_1],
-    status: 'pending',
-    referenceNo: 'IP20261005663910',
-    senderName: 'سارة خالد الديب',
-    senderIpaOrPhone: 'sara.eldeeb@instapay',
-    cashierName: 'كاشير محل مودرن',
-    createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    bankAccountUsed: 'alrawda.store@instapay',
-    customerPhone: '01155443322',
-  },
-  {
-    id: 'tx_104',
-    branchName: 'مخزن النادي',
-    branchId: 'b_nadi',
-    invoiceNo: 'طلب #4389',
-    amount: 1200.00,
-    screenshotUrl: SAMPLE_RECEIPT_2,
-    images: [SAMPLE_INVOICE, SAMPLE_RECEIPT_2],
-    status: 'verified',
-    referenceNo: 'IP20261005550182',
-    senderName: 'أشرف عبد الرحيم سليمان',
-    senderIpaOrPhone: '01001122334',
-    cashierName: 'أمين مخزن النادي',
-    createdAt: new Date(Date.now() - 1000 * 60 * 95).toISOString(),
-    verifiedAt: new Date(Date.now() - 1000 * 60 * 80).toISOString(),
-    verifiedBy: 'المراجع المالي (الروضة الشريفة)',
-    bankAccountUsed: 'alrawda.store@instapay',
-    accountantNotes: 'تمت مطابقة الإيداع في كشف البنك الأهلي رقم حركة 98823',
-  },
-  {
-    id: 'tx_105',
-    branchName: 'مخزن النحاس',
-    branchId: 'b_nahas',
-    invoiceNo: 'طلب #4385',
-    amount: 3600.00,
-    screenshotUrl: SAMPLE_RECEIPT_1,
-    images: [SAMPLE_INVOICE, SAMPLE_RECEIPT_1],
-    status: 'verified',
-    referenceNo: 'IP20261005441920',
-    senderName: 'هبة فوزي رضوان',
-    senderIpaOrPhone: 'heba.fawzy@instapay',
-    cashierName: 'أمين مخزن النحاس',
-    createdAt: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
-    verifiedAt: new Date(Date.now() - 1000 * 60 * 125).toISOString(),
-    verifiedBy: 'المراجع المالي (الروضة الشريفة)',
-    bankAccountUsed: 'alrawda.pos@instapay',
-  },
-];
+export const INITIAL_TRANSFERS: TransferItem[] = [];
 
 // Helper functions for user session
 export function loadUserSession(): UserSession | null {
@@ -240,17 +151,31 @@ export function clearUserSession() {
 
 // Helper functions for storage management
 export function loadTransfers(): TransferItem[] {
-  if (typeof window === 'undefined') return INITIAL_TRANSFERS;
+  if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.TRANSFERS);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.TRANSFERS, JSON.stringify(INITIAL_TRANSFERS));
-      return INITIAL_TRANSFERS;
+      localStorage.setItem(STORAGE_KEYS.TRANSFERS, JSON.stringify([]));
+      return [];
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      // Purge any residual mock seed transfers (tx_101 through tx_105)
+      const clean = parsed.filter((t: TransferItem) => !t.id.startsWith('tx_10'));
+      if (clean.length !== parsed.length) {
+        localStorage.setItem(STORAGE_KEYS.TRANSFERS, JSON.stringify(clean));
+      }
+      return clean;
+    }
+    return [];
   } catch {
-    return INITIAL_TRANSFERS;
+    return [];
   }
+}
+
+export function clearAllTransfers() {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEYS.TRANSFERS, JSON.stringify([]));
 }
 
 export function saveTransfers(transfers: TransferItem[]) {

@@ -71,6 +71,17 @@ export async function apiUpdateTransfer(
   }
 }
 
+export async function apiClearAllTransfers(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/transfers/clear', { method: 'POST' });
+    saveTransfers([]);
+    return res.ok;
+  } catch (err) {
+    saveTransfers([]);
+    return true;
+  }
+}
+
 // Branches API (For Reviewer Administration)
 export async function apiFetchBranches(): Promise<Branch[]> {
   try {

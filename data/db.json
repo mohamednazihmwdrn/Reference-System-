@@ -1,0 +1,90 @@
+{
+  "branches": [
+    {
+      "id": "b_rawda",
+      "name": "محل الروضة الشريفة",
+      "code": "ST-01",
+      "city": "الفرع الرئيسي",
+      "phone": "01029190615",
+      "pinCode": "1001",
+      "type": "store",
+      "isActive": true,
+      "defaultCashier": "كاشير الروضة الشريفة"
+    },
+    {
+      "id": "b_safa",
+      "name": "محل صفا مكرم",
+      "code": "ST-02",
+      "city": "القاهرة",
+      "phone": "01022334455",
+      "pinCode": "2002",
+      "type": "store",
+      "isActive": true,
+      "defaultCashier": "كاشير صفا مكرم"
+    },
+    {
+      "id": "b_modern",
+      "name": "محل مودرن",
+      "code": "ST-03",
+      "city": "القاهرة",
+      "phone": "01033445566",
+      "pinCode": "3003",
+      "type": "store",
+      "isActive": true,
+      "defaultCashier": "كاشير محل مودرن"
+    },
+    {
+      "id": "b_nadi",
+      "name": "مخزن النادي",
+      "code": "WH-01",
+      "city": "المعادي",
+      "phone": "01044556677",
+      "pinCode": "4004",
+      "type": "warehouse",
+      "isActive": true,
+      "defaultCashier": "أمين مخزن النادي"
+    },
+    {
+      "id": "b_nahas",
+      "name": "مخزن النحاس",
+      "code": "WH-02",
+      "city": "مصر الجديدة",
+      "phone": "01055667788",
+      "pinCode": "5005",
+      "type": "warehouse",
+      "isActive": true,
+      "defaultCashier": "أمين مخزن النحاس"
+    }
+  ],
+  "transfers": [],
+  "bankAccounts": [
+    {
+      "id": "ba_nbe",
+      "bankName": "البنك الأهلي المصري (NBE)",
+      "accountName": "شركة الروضة الشريفة",
+      "accountNumber": "10293847561001",
+      "instapayIpa": "alrawda.store@instapay",
+      "phone": "01029190615",
+      "isActive": true
+    },
+    {
+      "id": "ba_cib",
+      "bankName": "البنك التجاري الدولي (CIB)",
+      "accountName": "شركة الروضة الشريفة - حساب التحصيلات",
+      "accountNumber": "100049281723",
+      "instapayIpa": "alrawda.pos@instapay",
+      "phone": "01029190615",
+      "isActive": true
+    },
+    {
+      "id": "ba_misr",
+      "bankName": "بنك مصر (BM)",
+      "accountName": "شركة الروضة الشريفة",
+      "accountNumber": "124009837162",
+      "instapayIpa": "alrawda.co@instapay",
+      "phone": "01029190615",
+      "isActive": true
+    }
+  ],
+  "auditorPin": "9999"
+}

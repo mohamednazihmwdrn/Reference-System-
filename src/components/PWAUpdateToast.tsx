@@ -1,27 +1,79 @@
-import React, { useEffect } from 'react';
-import { useRegisterSW } from 'virtual:pwa-register/react';
+import React, { useEffect, useState } from 'react';
 import { RefreshCw, Sparkles, X } from 'lucide-react';
 
 export const PWAUpdateToast: React.FC = () => {
-  const {
-    needRefresh: [needRefresh, setNeedRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
-    onRegistered(r) {
-      // Periodically check for updates every 60 seconds across all devices
-      if (r) {
+  const [needRefresh, setNeedRefresh] = useState(false);
+  const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
+
+  useEffect(() => {
+    // Only register service worker in browser environment when supported
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+      return;
+    }
+
+    // In local dev mode, skip service worker registration to prevent Vite dev server errors
+    if (import.meta.env.DEV) {
+      return;
+    }
+
+    const handleServiceWorker = async () => {
+      try {
+        const registration = await navigator.serviceWorker.register('/sw.js');
+
+        // Check for updates periodically every 60 seconds
         setInterval(() => {
-          r.update();
+          registration.update().catch(() => {});
         }, 60 * 1000);
+
+        // If a new service worker is already waiting to activate
+        if (registration.waiting) {
+          setWaitingWorker(registration.waiting);
+          setNeedRefresh(true);
+        }
+
+        // Listen for new service worker installation
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                setWaitingWorker(newWorker);
+                setNeedRefresh(true);
+              }
+            });
+          }
+        });
+      } catch (err) {
+        console.warn('PWA service worker registration notice:', err);
       }
-    },
-    onRegisterError(error) {
-      console.warn('SW registration error', error);
-    },
-  });
+    };
+
+    if (document.readyState === 'complete') {
+      handleServiceWorker();
+    } else {
+      window.addEventListener('load', handleServiceWorker);
+    }
+
+    // Listen for controllerchange to reload page when new service worker takes over
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
+
+    return () => {
+      window.removeEventListener('load', handleServiceWorker);
+    };
+  }, []);
 
   const handleUpdate = () => {
-    updateServiceWorker(true);
+    if (waitingWorker) {
+      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+    } else {
+      window.location.reload();
+    }
   };
 
   if (!needRefresh) {
@@ -50,7 +102,7 @@ export const PWAUpdateToast: React.FC = () => {
           onClick={handleUpdate}
           className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow transition-colors flex items-center gap-1 cursor-pointer"
         >
-          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+          <RefreshCw className="w-3.5 h-3.5" />
           <span>تحديث</span>
         </button>
 

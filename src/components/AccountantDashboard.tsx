@@ -55,6 +55,7 @@ interface AccountantDashboardProps {
   onPrintSingleVoucher: (transfer: TransferItem) => void;
   onReturnToReception?: (transferId: string) => void;
   onGoToSettings?: () => void;
+  onClearAllTransfers?: () => void;
 }
 
 export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
@@ -68,6 +69,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   onPrintSingleVoucher,
   onReturnToReception,
   onGoToSettings,
+  onClearAllTransfers,
 }) => {
   // Main Auditor Mode: 'reception' (Default - clears on approve) vs 'archive' vs 'all'
   const [viewMode, setViewMode] = useState<AuditorViewMode>('reception');
@@ -118,6 +120,27 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   const rejectedTransfers = transfers.filter((t) => t.status === 'rejected');
   const archivedTransfers = transfers.filter((t) => t.status !== 'pending');
   const archivedAmount = archivedTransfers.filter((t) => t.status === 'verified').reduce((sum, t) => sum + t.amount, 0);
+
+  // Real-Time Stats for Request 8: (Pending count, Amount verified today, Rejected count)
+  const todayDateStr = useMemo(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }, []);
+
+  const verifiedTodayTransfers = useMemo(() => {
+    return transfers.filter((t) => {
+      if (t.status !== 'verified') return false;
+      const vDate = t.verifiedAt ? t.verifiedAt.slice(0, 10) : t.createdAt.slice(0, 10);
+      return vDate === todayDateStr;
+    });
+  }, [transfers, todayDateStr]);
+
+  const verifiedTodayAmount = useMemo(() => {
+    return verifiedTodayTransfers.reduce((sum, t) => sum + t.amount, 0);
+  }, [verifiedTodayTransfers]);
 
   // Filtered & Sorted Transfers based on current viewMode
   const filteredTransfers = useMemo(() => {
@@ -370,6 +393,126 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             >
               <Download className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* Real-Time Stats Summary Card (Request 8) */}
+        {/* Shows: 1. Number of pending transfers */}
+        {/*        2. Total amount verified today */}
+        {/*        3. Number of rejected transfers */}
+        {/* ========================================================================= */}
+        <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3.5 space-y-2.5">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              </span>
+              <span className="text-xs font-black tracking-wide text-slate-200">
+                المؤشرات اللحظية والمطابقة المباشرة (Real-Time Summary)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2.5 py-0.5 rounded-full border border-slate-700">
+                اليوم: {todayDateStr}
+              </span>
+              {onClearAllTransfers && transfers.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('هل أنت متأكد من تنظيف وتفريغ كافة الحركات والوصولات نهائياً لبدء العمل الفعلي على نظافة؟')) {
+                      onClearAllTransfers();
+                    }
+                  }}
+                  className="text-[10px] text-red-300 hover:text-white bg-red-950/60 hover:bg-red-900 border border-red-700/60 px-2 py-0.5 rounded-full font-bold cursor-pointer transition-colors"
+                  title="تصفير وتنظيف الحركات لبدء العمل الفعلي"
+                >
+                  تصفير السجلات 🧹
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-right">
+            {/* 1. Number of pending transfers */}
+            <div
+              onClick={() => setViewMode('reception')}
+              className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                viewMode === 'reception'
+                  ? 'bg-amber-950/60 border-amber-400 ring-1 ring-amber-400/40'
+                  : 'bg-slate-900/80 border-slate-800 hover:border-amber-500/50'
+              }`}
+            >
+              <div>
+                <div className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>التحويلات المعلقة</span>
+                </div>
+                <div className="text-2xl font-black font-mono text-white mt-1">
+                  {pendingTransfers.length}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  {pendingTransfers.length === 0 ? '✨ لا توجد معلقات (نظيف)' : 'بانتظار الاعتماد بالاستقبال'}
+                </div>
+              </div>
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center font-mono text-amber-400 font-bold text-sm">
+                {pendingTransfers.length}
+              </div>
+            </div>
+
+            {/* 2. Total amount verified today */}
+            <div
+              onClick={() => { setViewMode('archive'); setSelectedArchiveStatus('verified'); }}
+              className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                viewMode === 'archive' && selectedArchiveStatus === 'verified'
+                  ? 'bg-emerald-950/60 border-emerald-400 ring-1 ring-emerald-400/40'
+                  : 'bg-slate-900/80 border-slate-800 hover:border-emerald-500/50'
+              }`}
+            >
+              <div>
+                <div className="text-[11px] font-bold text-emerald-300 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>المبلغ المعتمد اليوم</span>
+                </div>
+                <div className="text-xl sm:text-2xl font-black font-mono text-emerald-300 mt-1">
+                  {verifiedTodayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <span className="text-[10px] text-emerald-400 font-sans mr-1">ج.م</span>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  {verifiedTodayTransfers.length} إيصال معتمد ومرحل اليوم
+                </div>
+              </div>
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+            </div>
+
+            {/* 3. Number of rejected transfers */}
+            <div
+              onClick={() => { setViewMode('archive'); setSelectedArchiveStatus('rejected'); }}
+              className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                viewMode === 'archive' && selectedArchiveStatus === 'rejected'
+                  ? 'bg-red-950/60 border-red-400 ring-1 ring-red-400/40'
+                  : 'bg-slate-900/80 border-slate-800 hover:border-red-500/50'
+              }`}
+            >
+              <div>
+                <div className="text-[11px] font-bold text-red-300 flex items-center gap-1.5">
+                  <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                  <span>التحويلات المرفوضة</span>
+                </div>
+                <div className="text-2xl font-black font-mono text-white mt-1">
+                  {rejectedTransfers.length}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  {rejectedTransfers.length === 0 ? 'لا توجد تحويلات مرفوضة' : 'مرفوضة وتحتاج تعديل'}
+                </div>
+              </div>
+              <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center font-mono text-red-400 font-bold text-sm">
+                {rejectedTransfers.length}
+              </div>
+            </div>
           </div>
         </div>
 

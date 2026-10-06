@@ -50,6 +50,7 @@ interface SettingsViewProps {
   onUpdateBankAccounts: (accounts: BankAccount[]) => void;
   onDataReset: () => void;
   onGoToDashboard?: () => void;
+  onClearAllTransfers?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -60,6 +61,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onUpdateBankAccounts,
   onDataReset,
   onGoToDashboard,
+  onClearAllTransfers,
 }) => {
   // Navigation / Filter inside Settings
   const [activeTab, setActiveTab] = useState<'branches' | 'banks' | 'backup'>('branches');
@@ -1005,6 +1007,38 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <RotateCcw className="w-4 h-4" />
                 <span>إعادة ضبط البيانات</span>
               </button>
+            </div>
+
+            {/* 4. Clean Slate / Wipe All Transactions for Live Production */}
+            <div className="border-2 border-amber-300 rounded-2xl p-4 space-y-3 bg-amber-50/70 md:col-span-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-200 text-amber-800 flex items-center justify-center font-bold shrink-0">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-amber-950">تصفير وتنظيف كافة الحركات والوصولات (بدء التشغيل الفعلي)</div>
+                    <div className="text-xs text-amber-800 mt-0.5">
+                      تفريغ صندوق الاستقبال والأرشيف بالكامل من أي فواتير وتجارب سابقة، مع الحفاظ الكامل على كافة حسابات الفروع والمخازن والبنوك وأرقامها السرية.
+                    </div>
+                  </div>
+                </div>
+                {onClearAllTransfers && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm('هل أنت متأكد تماماً من تصفير ومسح كافة الفواتير والوصولات السابقة للبدء الفعلي؟ (ستبقى كافة الفروع والمخازن والبنوك محفوظة كما هي)')) {
+                        onClearAllTransfers();
+                        triggerToast('تم تنظيف وتصفير النظام بنجاح! المنظومة الآن خالية تماماً من أي وصولات ومستعدة لبدء العمل الفعلي ✓');
+                      }
+                    }}
+                    className="py-2.5 px-4 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer whitespace-nowrap shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>تصفير وتنظيف الحركات الآن 🧹</span>
+                  </button>
+                )}
+              </div>
             </div>
 
           </div>

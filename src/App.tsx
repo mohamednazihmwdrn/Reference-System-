@@ -41,6 +41,7 @@ import {
   apiCreateBranch,
   apiUpdateBranch,
   apiDeleteBranch,
+  apiClearAllTransfers,
   subscribeToLiveUpdates,
 } from './utils/api';
 import { soundManager } from './utils/audio';
@@ -81,7 +82,10 @@ export default function App() {
   useEffect(() => {
     // Initial fetch from backend server
     apiFetchTransfers().then((data) => {
-      if (data && data.length > 0) setTransfers(data);
+      if (Array.isArray(data)) {
+        setTransfers(data);
+        saveTransfers(data);
+      }
     });
     apiFetchBranches().then((data) => {
       if (data && data.length > 0) setBranches(data);
@@ -90,13 +94,16 @@ export default function App() {
     // Real-time live synchronization (SSE + Polling)
     const unsubscribe = subscribeToLiveUpdates(async () => {
       const serverTransfers = await apiFetchTransfers();
-      setTransfers((prev) => {
-        // Play chime if new pending items arrived for auditor
-        if (serverTransfers.length > prev.length) {
-          soundManager.playNewIncoming();
-        }
-        return serverTransfers;
-      });
+      if (Array.isArray(serverTransfers)) {
+        setTransfers((prev) => {
+          // Play chime if new pending items arrived for auditor
+          if (serverTransfers.length > prev.length) {
+            soundManager.playNewIncoming();
+          }
+          return serverTransfers;
+        });
+        saveTransfers(serverTransfers);
+      }
 
       const serverBranches = await apiFetchBranches();
       if (serverBranches && serverBranches.length > 0) {
@@ -284,6 +291,13 @@ export default function App() {
     }
   };
 
+  // Clear all transactions/transfers for clean slate production start
+  const handleClearAllTransfers = async () => {
+    await apiClearAllTransfers();
+    setTransfers([]);
+    saveTransfers([]);
+  };
+
   const handleDataReset = () => {
     setTransfers(loadTransfers());
     setBranches(loadBranches());
@@ -365,6 +379,7 @@ export default function App() {
             onPrintSingleVoucher={(t) => setVoucherModalTransfer(t)}
             onReturnToReception={handleReturnToReception}
             onGoToSettings={() => setActiveTab('settings')}
+            onClearAllTransfers={handleClearAllTransfers}
           />
         )}
 
@@ -385,6 +400,7 @@ export default function App() {
             onUpdateBankAccounts={setBankAccounts}
             onDataReset={handleDataReset}
             onGoToDashboard={() => setActiveTab('dashboard')}
+            onClearAllTransfers={handleClearAllTransfers}
           />
         )}
       </main>

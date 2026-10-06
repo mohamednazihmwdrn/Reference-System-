@@ -81,68 +81,7 @@ const DEFAULT_SEED = {
       defaultCashier: 'أمين مخزن النحاس',
     },
   ],
-  transfers: [
-    {
-      id: 'tx_101',
-      branchName: 'محل الروضة الشريفة',
-      branchId: 'b_rawda',
-      invoiceNo: 'طلب #4401',
-      amount: 2450.00,
-      screenshotUrl: '/src/assets/images/instapay_sample_receipt_1791231113924.jpg',
-      images: [
-        '/src/assets/images/paper_invoice_receipt_1791231743153.jpg',
-        '/src/assets/images/instapay_sample_receipt_1791231113924.jpg'
-      ],
-      status: 'pending',
-      referenceNo: 'IP20261005882194',
-      senderName: 'طارق حسام عبد الرحمن',
-      senderIpaOrPhone: 'tarek.hossam@instapay',
-      cashierName: 'كاشير الروضة الشريفة',
-      createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-      bankAccountUsed: 'alrawda.store@instapay',
-      customerPhone: '01099234567',
-    },
-    {
-      id: 'tx_102',
-      branchName: 'محل صفا مكرم',
-      branchId: 'b_safa',
-      invoiceNo: 'طلب #4402',
-      amount: 850.00,
-      screenshotUrl: '/src/assets/images/instapay_sample_receipt_two_1791231126875.jpg',
-      images: [
-        '/src/assets/images/paper_invoice_receipt_1791231743153.jpg',
-        '/src/assets/images/instapay_sample_receipt_two_1791231126875.jpg'
-      ],
-      status: 'pending',
-      referenceNo: 'IP20261005771029',
-      senderName: 'مينا كمال غطاس',
-      senderIpaOrPhone: '01288334455',
-      cashierName: 'كاشير صفا مكرم',
-      createdAt: new Date(Date.now() - 1000 * 60 * 28).toISOString(),
-      bankAccountUsed: 'alrawda.pos@instapay',
-      customerPhone: '01288334455',
-    },
-    {
-      id: 'tx_103',
-      branchName: 'محل مودرن',
-      branchId: 'b_modern',
-      invoiceNo: 'طلب #4398',
-      amount: 4720.50,
-      screenshotUrl: '/src/assets/images/instapay_sample_receipt_1791231113924.jpg',
-      images: [
-        '/src/assets/images/paper_invoice_receipt_1791231743153.jpg',
-        '/src/assets/images/instapay_sample_receipt_1791231113924.jpg'
-      ],
-      status: 'pending',
-      referenceNo: 'IP20261005663910',
-      senderName: 'سارة خالد الديب',
-      senderIpaOrPhone: 'sara.eldeeb@instapay',
-      cashierName: 'كاشير محل مودرن',
-      createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-      bankAccountUsed: 'alrawda.store@instapay',
-      customerPhone: '01155443322',
-    },
-  ],
+  transfers: [] as Array<any>,
   bankAccounts: [
     {
       id: 'ba_nbe',
@@ -268,6 +207,21 @@ app.delete('/api/transfers/:id', (req, res) => {
   db.transfers = (db.transfers || []).filter((t: { id: string }) => t.id !== id);
   writeDb(db);
   res.json({ success: true });
+});
+
+// Clear all transfers completely (System Wipe for production start)
+app.post('/api/transfers/clear', (_req, res) => {
+  const db = readDb();
+  db.transfers = [];
+  writeDb(db);
+  res.json({ success: true, count: 0 });
+});
+
+app.delete('/api/transfers', (_req, res) => {
+  const db = readDb();
+  db.transfers = [];
+  writeDb(db);
+  res.json({ success: true, count: 0 });
 });
 
 // 2. BRANCHES API (Add, Edit PIN, Delete by Reviewer/Admin)
