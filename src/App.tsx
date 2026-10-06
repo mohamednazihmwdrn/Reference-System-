@@ -199,6 +199,24 @@ export default function App() {
     await apiUpdateTransfer(transferId, updates);
   };
 
+  // Return archived transfer back to reception (un-archive)
+  const handleReturnToReception = async (transferId: string) => {
+    const existing = transfers.find((t) => t.id === transferId);
+    const updates: Partial<TransferItem> = {
+      status: 'pending',
+      verifiedAt: undefined,
+      verifiedBy: undefined,
+      accountantNotes: existing?.accountantNotes ? `${existing.accountantNotes} (أعيد للاستقبال)` : undefined,
+    };
+
+    setTransfers((prev) =>
+      prev.map((t) => (t.id === transferId ? { ...t, ...updates } : t))
+    );
+
+    await apiUpdateTransfer(transferId, updates);
+    soundManager.playNewIncoming();
+  };
+
   // Cashier re-upload for rejected item
   const handleReuploadTransfer = async (transferId: string, newScreenshot: string, notes?: string) => {
     const existing = transfers.find((t) => t.id === transferId);
@@ -325,11 +343,12 @@ export default function App() {
             transfers={transfers}
             branches={branches}
             onOpenVerifyModal={(t) => setInspectingTransfer(t)}
-            onQuickApprove={(id) => handleApproveTransfer(id, 'اعتماد سريع من الجدول')}
+            onQuickApprove={(id) => handleApproveTransfer(id, 'اعتماد فوري وترحيل للأرشيف')}
             onQuickReject={(id, reason) => handleRejectTransfer(id, reason)}
             onBulkApprove={handleBulkApprove}
             onOpenPrintReport={() => setIsPrintReportOpen(true)}
             onPrintSingleVoucher={(t) => setVoucherModalTransfer(t)}
+            onReturnToReception={handleReturnToReception}
           />
         )}
 
