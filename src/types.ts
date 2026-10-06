@@ -30,10 +30,13 @@ export interface Branch {
   code: string;
   city: string;
   phone?: string;
+  address?: string;
+  notes?: string;
   pinCode: string; // الرقم السري للدخول
   isActive: boolean;
   defaultCashier?: string;
   type: 'store' | 'warehouse';
+  createdAt?: string;
 }
 
 export type UserRole = 'branch_cashier' | 'auditor';

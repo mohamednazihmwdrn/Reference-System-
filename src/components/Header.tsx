@@ -9,9 +9,11 @@ import {
   Check,
   LogOut,
   ShieldCheck,
-  Shield
+  Shield,
+  Settings
 } from 'lucide-react';
 import { Branch, UserSession } from '../types';
+import { PWAInstallPrompt } from './PWAInstallPrompt';
 
 export type ActiveTab = 'cashier' | 'cashier_feed' | 'dashboard' | 'bank_recon' | 'settings';
 
@@ -72,6 +74,9 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Header Actions */}
           <div className="flex items-center gap-1.5">
+            {/* Install PWA Prompt button (auto-hides when running standalone) */}
+            <PWAInstallPrompt variant="compact" />
+
             {isAuditor && pendingCount > 0 && activeTab !== 'dashboard' && (
               <button
                 type="button"
@@ -106,13 +111,29 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Print daily sheet button (Auditor only) */}
             {isAuditor && (
-              <button
-                onClick={onOpenPrintReport}
-                className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>طباعة</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('settings')}
+                  className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
+                    activeTab === 'settings'
+                      ? 'bg-blue-600 border-blue-500 text-white'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                  }`}
+                  title="الإعدادات الكاملة للمعارض والمخازن وكلمات السر"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>إدارة المعارض والمخازن</span>
+                </button>
+
+                <button
+                  onClick={onOpenPrintReport}
+                  className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>طباعة</span>
+                </button>
+              </>
             )}
 
             {/* Logout button */}

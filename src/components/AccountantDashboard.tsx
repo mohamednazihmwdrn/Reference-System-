@@ -35,7 +35,8 @@ import {
   Sparkles,
   Undo2,
   CheckCheck,
-  Send
+  Send,
+  Settings
 } from 'lucide-react';
 import { TransferItem, Branch } from '../types';
 import { soundManager } from '../utils/audio';
@@ -53,6 +54,7 @@ interface AccountantDashboardProps {
   onOpenPrintReport: () => void;
   onPrintSingleVoucher: (transfer: TransferItem) => void;
   onReturnToReception?: (transferId: string) => void;
+  onGoToSettings?: () => void;
 }
 
 export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
@@ -65,6 +67,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   onOpenPrintReport,
   onPrintSingleVoucher,
   onReturnToReception,
+  onGoToSettings,
 }) => {
   // Main Auditor Mode: 'reception' (Default - clears on approve) vs 'archive' vs 'all'
   const [viewMode, setViewMode] = useState<AuditorViewMode>('reception');
@@ -337,6 +340,19 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {onGoToSettings && (
+              <button
+                type="button"
+                onClick={onGoToSettings}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-white rounded-xl text-xs font-bold border border-slate-700 transition-all cursor-pointer"
+                title="الإعدادات الكاملة لإدارة المعارض والمخازن وكلمات السر"
+              >
+                <Settings className="w-4 h-4 text-amber-400" />
+                <span className="hidden sm:inline">إدارة المعارض والمخازن</span>
+                <span className="sm:hidden">الإعدادات</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={onOpenPrintReport}

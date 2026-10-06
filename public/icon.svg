@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="50%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#e2e8f0" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+
+  <!-- Outer Ring Accent -->
+  <rect x="24" y="24" width="464" height="464" rx="88" fill="none" stroke="#60a5fa" stroke-width="6" stroke-opacity="0.4" />
+
+  <!-- Central Shield / Security Symbol -->
+  <g filter="url(#shadow)">
+    <!-- Shield Outline -->
+    <path d="M256 96 L376 144 C376 264 256 348 256 376 C256 348 136 264 136 144 Z" fill="url(#shieldGrad)" />
+    
+    <!-- Inner Emblem: Building / Store + Verification Check -->
+    <!-- Store Roof -->
+    <path d="M192 196 L256 160 L320 196 L320 208 L192 208 Z" fill="#1e40af" />
+    
+    <!-- Store Pillars -->
+    <rect x="204" y="216" width="16" height="40" rx="3" fill="#1e40af" />
+    <rect x="248" y="216" width="16" height="40" rx="3" fill="#1e40af" />
+    <rect x="292" y="216" width="16" height="40" rx="3" fill="#1e40af" />
+    <rect x="188" y="258" width="136" height="10" rx="3" fill="#1e40af" />
+
+    <!-- Green Verification Badge -->
+    <circle cx="256" cy="316" r="34" fill="#10b981" />
+    <path d="M242 316 L252 326 L272 304" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+
+  <!-- Text: الروضة -->
+  <text x="256" y="440" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="44" fill="#ffffff" text-anchor="middle" letter-spacing="1">الروضة الشريفة</text>
+</svg>

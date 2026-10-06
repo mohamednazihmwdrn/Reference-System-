@@ -301,7 +301,22 @@ app.put('/api/branches/:id', (req, res) => {
   const index = (db.branches || []).findIndex((b: { id: string }) => b.id === id);
 
   if (index === -1) {
-    return res.status(404).json({ error: 'Branch not found' });
+    const newBranch = {
+      id,
+      name: req.body.name || 'فرع جديد',
+      code: req.body.code || `BR-${Math.floor(10 + Math.random() * 90)}`,
+      city: req.body.city || 'الفرع',
+      phone: req.body.phone || '',
+      address: req.body.address || '',
+      notes: req.body.notes || '',
+      pinCode: req.body.pinCode || `${Math.floor(1000 + Math.random() * 9000)}`,
+      type: req.body.type || 'store',
+      isActive: req.body.isActive !== false,
+      defaultCashier: req.body.defaultCashier || 'كاشير الفرع',
+    };
+    db.branches = [...(db.branches || []), newBranch];
+    writeDb(db);
+    return res.status(201).json(newBranch);
   }
 
   db.branches[index] = { ...db.branches[index], ...req.body };

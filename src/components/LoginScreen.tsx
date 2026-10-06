@@ -14,6 +14,7 @@ import {
 import { Branch, UserSession } from '../types';
 import { AUDITOR_CREDENTIALS, COMPANY_INFO } from '../utils/storage';
 import { soundManager } from '../utils/audio';
+import { PWAInstallPrompt } from './PWAInstallPrompt';
 
 interface LoginScreenProps {
   branches: Branch[];
@@ -71,6 +72,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
 
+    const branchObj = branches.find((item) => item.id === selectedAccountId);
+    if (branchObj && branchObj.isActive === false) {
+      setErrorMsg(`حساب (${branchObj.name}) معطل مؤقتاً من قبل الإدارة والمراجع المالي`);
+      return;
+    }
+
     if (!pinPassword.trim()) {
       setErrorMsg('يرجى كتابة كلمة السر الخاصة بالفرع');
       return;
@@ -115,6 +122,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
       {/* Login Card with Professional Dropdown & Password Field */}
       <div className="max-w-md mx-auto w-full my-auto py-4">
+        {/* PWA Mobile App Install Banner */}
+        <PWAInstallPrompt variant="banner" className="mb-3.5" />
+
         <div className="bg-slate-800/95 border border-slate-700 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5">
           
           <div className="text-center space-y-1">

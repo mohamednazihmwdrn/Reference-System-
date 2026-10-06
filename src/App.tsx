@@ -16,6 +16,7 @@ import { SettingsView } from './components/SettingsView';
 import { PrintReportModal } from './components/PrintReportModal';
 import { SingleTransferVoucherModal } from './components/SingleTransferVoucherModal';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
+import { PWAUpdateToast } from './components/PWAUpdateToast';
 
 import { TransferItem, Branch, BankAccount, UserSession } from './types';
 import {
@@ -265,8 +266,17 @@ export default function App() {
 
   // Branches Management Handlers (Reviewer / Admin)
   const handleUpdateBranches = async (updatedBranches: Branch[]) => {
+    const previousBranches = branches;
+    const updatedIds = new Set(updatedBranches.map((b) => b.id));
+    const deletedBranches = previousBranches.filter((b) => !updatedIds.has(b.id));
+
     setBranches(updatedBranches);
     saveBranches(updatedBranches);
+
+    // Delete removed branches from server
+    for (const d of deletedBranches) {
+      await apiDeleteBranch(d.id);
+    }
 
     // Sync with server API
     for (const b of updatedBranches) {
@@ -283,11 +293,14 @@ export default function App() {
   // If not logged in, show Login Screen with 5 branches + Auditor
   if (!currentSession) {
     return (
-      <LoginScreen
-        branches={branches}
-        onLoginSuccess={handleLoginSuccess}
-        onOpenPrivacyPolicy={() => setIsPrivacyModalOpen(true)}
-      />
+      <>
+        <PWAUpdateToast />
+        <LoginScreen
+          branches={branches}
+          onLoginSuccess={handleLoginSuccess}
+          onOpenPrivacyPolicy={() => setIsPrivacyModalOpen(true)}
+        />
+      </>
     );
   }
 
@@ -297,7 +310,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-600 selection:text-white" dir="rtl">
-      
+      {/* PWA Auto-Update Notification Banner */}
+      <PWAUpdateToast />
+
       {/* Mobile Top App Bar */}
       <Header
         activeTab={activeTab}
@@ -349,6 +364,7 @@ export default function App() {
             onOpenPrintReport={() => setIsPrintReportOpen(true)}
             onPrintSingleVoucher={(t) => setVoucherModalTransfer(t)}
             onReturnToReception={handleReturnToReception}
+            onGoToSettings={() => setActiveTab('settings')}
           />
         )}
 
@@ -363,10 +379,12 @@ export default function App() {
         {activeTab === 'settings' && (
           <SettingsView
             branches={branches}
+            transfers={transfers}
             bankAccounts={bankAccounts}
             onUpdateBranches={handleUpdateBranches}
             onUpdateBankAccounts={setBankAccounts}
             onDataReset={handleDataReset}
+            onGoToDashboard={() => setActiveTab('dashboard')}
           />
         )}
       </main>
