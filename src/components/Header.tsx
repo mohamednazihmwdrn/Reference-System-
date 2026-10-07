@@ -10,12 +10,13 @@ import {
   LogOut,
   ShieldCheck,
   Shield,
-  Settings
+  Settings,
+  Radio
 } from 'lucide-react';
 import { Branch, UserSession } from '../types';
 import { PWAInstallPrompt } from './PWAInstallPrompt';
 
-export type ActiveTab = 'cashier' | 'cashier_feed' | 'dashboard' | 'bank_recon' | 'settings';
+export type ActiveTab = 'cashier' | 'cashier_feed' | 'dashboard' | 'bank_recon' | 'settings' | 'chat';
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -74,6 +75,21 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Header Actions */}
           <div className="flex items-center gap-1.5">
+            {/* Walkie-Talkie & Chat Quick Trigger */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('chat')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'chat'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm shadow-amber-500/30'
+                  : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700'
+              }`}
+              title="اللاسلكي الفوري وغرفة الدردشة المباشرة"
+            >
+              <Radio className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">لاسلكي وشات</span>
+            </button>
+
             {/* Install PWA Prompt button (auto-hides when running standalone) */}
             <PWAInstallPrompt variant="compact" />
 

@@ -32,36 +32,36 @@ export const COMPANY_INFO = {
 export const DEFAULT_BRANCHES: Branch[] = [
   {
     id: 'b_rawda',
-    name: 'محل الروضة الشريفة',
+    name: 'معرض الروضة الشريفة',
     code: 'ST-01',
     city: 'الفرع الرئيسي',
     phone: '01029190615',
     pinCode: '1001',
     type: 'store',
     isActive: true,
-    defaultCashier: 'كاشير الروضة الشريفة',
+    defaultCashier: 'كاشير معرض الروضة الشريفة',
   },
   {
     id: 'b_safa',
-    name: 'محل صفا مكرم',
+    name: 'معرض صفا مكرم',
     code: 'ST-02',
     city: 'القاهرة',
     phone: '01022334455',
     pinCode: '2002',
     type: 'store',
     isActive: true,
-    defaultCashier: 'كاشير صفا مكرم',
+    defaultCashier: 'كاشير معرض صفا مكرم',
   },
   {
     id: 'b_modern',
-    name: 'محل مودرن',
+    name: 'معرض مودرن',
     code: 'ST-03',
     city: 'القاهرة',
     phone: '01033445566',
     pinCode: '3003',
     type: 'store',
     isActive: true,
-    defaultCashier: 'كاشير محل مودرن',
+    defaultCashier: 'كاشير معرض مودرن',
   },
   {
     id: 'b_nadi',
@@ -181,9 +181,26 @@ export function clearAllTransfers() {
 export function saveTransfers(transfers: TransferItem[]) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEYS.TRANSFERS, JSON.stringify(transfers));
-  } catch (err) {
-    console.error('Failed to save transfers to localStorage', err);
+    // Keep local cache lightweight by preventing heavy base64 strings from overflowing localStorage
+    const safeTransfers = transfers.map((t, idx) => {
+      if (idx > 3 && t.screenshotUrl?.startsWith('data:image/')) {
+        return { ...t, screenshotUrl: '', images: [] };
+      }
+      return t;
+    });
+    localStorage.setItem(STORAGE_KEYS.TRANSFERS, JSON.stringify(safeTransfers));
+  } catch (err: any) {
+    console.warn('LocalStorage quota limit reached, trimming local cache:', err);
+    try {
+      const minimal = transfers.slice(0, 8).map((t) => ({
+        ...t,
+        screenshotUrl: t.screenshotUrl?.startsWith('data:image/') ? '' : t.screenshotUrl,
+        images: [],
+      }));
+      localStorage.setItem(STORAGE_KEYS.TRANSFERS, JSON.stringify(minimal));
+    } catch {
+      // Local storage full; server remains authoritative
+    }
   }
 }
 
@@ -244,8 +261,8 @@ export function setLastBranchId(branchId: string) {
 }
 
 export function getLastCashierName(): string {
-  if (typeof window === 'undefined') return 'أحمد محمود';
-  return localStorage.getItem(STORAGE_KEYS.LAST_CASHIER_NAME) || 'أحمد محمود';
+  if (typeof window === 'undefined') return 'كاشير المعرض';
+  return localStorage.getItem(STORAGE_KEYS.LAST_CASHIER_NAME) || 'كاشير المعرض';
 }
 
 export function setLastCashierName(name: string) {

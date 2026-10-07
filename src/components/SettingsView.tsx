@@ -188,6 +188,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const autoCode = addForm.code.trim().toUpperCase() || 
       (addForm.type === 'store' ? `ST-0${storeCount + 1}` : `WH-0${warehouseCount + 1}`);
 
+    const cleanRoleTitle = addForm.type === 'warehouse'
+      ? (addForm.name.startsWith('مخزن') ? `أمين ${addForm.name}` : `أمين مخزن ${addForm.name}`)
+      : (addForm.name.startsWith('معرض') ? `كاشير ${addForm.name}` : `كاشير معرض ${addForm.name}`);
+
     const newBranch: Branch = {
       id: `b_${Date.now()}`,
       name: addForm.name.trim(),
@@ -198,7 +202,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       pinCode: addForm.pin.trim() || generateRandomPin(),
       type: addForm.type,
       isActive: true,
-      defaultCashier: addForm.cashier.trim() || (addForm.type === 'store' ? 'كاشير المحل' : 'أمين المخزن'),
+      defaultCashier: addForm.cashier.trim() || cleanRoleTitle,
       notes: addForm.notes.trim(),
       createdAt: new Date().toISOString(),
     };
@@ -346,7 +350,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   return (
-    <div className="py-5 px-3 sm:px-6 max-w-7xl mx-auto space-y-6 pb-24 select-none animate-in fade-in duration-150">
+    <div className="py-5 px-3 sm:px-6 max-w-7xl mx-auto space-y-6 pb-36 sm:pb-44 select-none animate-in fade-in duration-150">
       
       {/* ========================================================================= */}
       {/* Toast Notification Banner */}
@@ -695,10 +699,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   {/* Contact & Assignment Details */}
                   <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50/80 p-3 rounded-2xl border border-slate-100">
                     <div>
-                      <span className="text-[10px] text-slate-400 font-semibold block">المسؤول / الكاشير:</span>
+                      <span className="text-[10px] text-slate-400 font-semibold block">المسمى الوظيفي للحساب:</span>
                       <span className="font-bold text-slate-800 flex items-center gap-1 mt-0.5">
                         <User className="w-3 h-3 text-slate-400" />
-                        <span>{branch.defaultCashier || 'كاشير الفرع'}</span>
+                        <span>{branch.defaultCashier || (isStore ? 'كاشير المعرض' : 'أمين المخزن')}</span>
                       </span>
                     </div>
 
@@ -1148,10 +1152,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               {/* Cashier & Phone */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">اسم المسؤول / الكاشير:</label>
+                  <label className="font-bold text-slate-700 block mb-1">المسمى الوظيفي للحساب (كاشير / أمين مخزن):</label>
                   <input
                     type="text"
-                    placeholder="مثال: حسام علي"
+                    placeholder={addForm.type === 'store' ? 'مثال: كاشير معرض صفا مكرم' : 'مثال: أمين مخزن النادي'}
                     value={addForm.cashier}
                     onChange={(e) => setAddForm({ ...addForm, cashier: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-blue-500"
@@ -1319,9 +1323,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               {/* Cashier & Phone */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">المسؤول / الكاشير:</label>
+                  <label className="font-bold text-slate-700 block mb-1">المسمى الوظيفي للحساب (كاشير / أمين مخزن):</label>
                   <input
                     type="text"
+                    placeholder={editingBranch.type === 'store' ? 'مثال: كاشير معرض صفا مكرم' : 'مثال: أمين مخزن النادي'}
                     value={editingBranch.defaultCashier || ''}
                     onChange={(e) => setEditingBranch({ ...editingBranch, defaultCashier: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-blue-500"

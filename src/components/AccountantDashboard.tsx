@@ -311,7 +311,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   };
 
   return (
-    <div className="space-y-4 pb-20 select-none animate-in fade-in duration-150">
+    <div className="space-y-4 pb-36 sm:pb-44 select-none animate-in fade-in duration-150">
       
       {/* ========================================================================= */}
       {/* Toast Notification Banner (Real-time Feedback on Approval & Archiving) */}

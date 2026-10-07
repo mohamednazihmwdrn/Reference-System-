@@ -1,4 +1,4 @@
-import { TransferItem, Branch, BankAccount } from '../types';
+import { TransferItem, Branch, BankAccount, ChatMessage } from '../types';
 import { 
   loadTransfers, 
   saveTransfers, 
@@ -150,16 +150,56 @@ export async function apiDeleteBranch(id: string): Promise<boolean> {
   }
 }
 
+// 4. Messages & Walkie-Talkie API
+export async function apiFetchMessages(): Promise<ChatMessage[]> {
+  try {
+    const res = await fetch('/api/messages');
+    if (!res.ok) throw new Error('Failed to fetch messages');
+    return await res.json();
+  } catch (err) {
+    return [];
+  }
+}
+
+export async function apiSendMessage(msg: Partial<ChatMessage>): Promise<ChatMessage | null> {
+  try {
+    const res = await fetch('/api/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(msg),
+    });
+    if (!res.ok) throw new Error('Failed to send message');
+    return await res.json();
+  } catch (err) {
+    console.error('Failed to send message:', err);
+    return null;
+  }
+}
+
+export async function apiClearMessages(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/messages/clear', { method: 'POST' });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // Live real-time listener across separated phones (SSE with Polling fallback)
-export function subscribeToLiveUpdates(onUpdate: () => void): () => void {
+export function subscribeToLiveUpdates(onUpdate: (eventData?: any) => void): () => void {
   let eventSource: EventSource | null = null;
   let pollInterval: ReturnType<typeof setInterval> | null = null;
 
   try {
     if (typeof window !== 'undefined' && 'EventSource' in window) {
       eventSource = new EventSource('/api/events');
-      eventSource.onmessage = () => {
-        onUpdate();
+      eventSource.onmessage = (e) => {
+        try {
+          const parsed = JSON.parse(e.data);
+          onUpdate(parsed);
+        } catch {
+          onUpdate();
+        }
       };
       eventSource.onerror = () => {
         // Fallback to polling if SSE drops
@@ -169,10 +209,10 @@ export function subscribeToLiveUpdates(onUpdate: () => void): () => void {
     // SSE not supported
   }
 
-  // Backup polling every 3.5 seconds to guarantee 100% sync even on weak mobile cellular connections
+  // Backup polling every 2.5 seconds to guarantee 100% sync even on weak mobile cellular connections
   pollInterval = setInterval(() => {
     onUpdate();
-  }, 3500);
+  }, 2500);
 
   return () => {
     if (eventSource) {

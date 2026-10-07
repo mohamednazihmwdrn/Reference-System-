@@ -2,36 +2,36 @@
   "branches": [
     {
       "id": "b_rawda",
-      "name": "محل الروضة الشريفة",
+      "name": "معرض الروضة الشريفة",
       "code": "ST-01",
       "city": "الفرع الرئيسي",
       "phone": "01029190615",
       "pinCode": "1001",
       "type": "store",
       "isActive": true,
-      "defaultCashier": "كاشير الروضة الشريفة"
+      "defaultCashier": "كاشير معرض الروضة الشريفة"
     },
     {
       "id": "b_safa",
-      "name": "محل صفا مكرم",
+      "name": "معرض صفا مكرم",
       "code": "ST-02",
       "city": "القاهرة",
       "phone": "01022334455",
       "pinCode": "2002",
       "type": "store",
       "isActive": true,
-      "defaultCashier": "كاشير صفا مكرم"
+      "defaultCashier": "كاشير معرض صفا مكرم"
     },
     {
       "id": "b_modern",
-      "name": "محل مودرن",
+      "name": "معرض مودرن",
       "code": "ST-03",
       "city": "القاهرة",
       "phone": "01033445566",
       "pinCode": "3003",
       "type": "store",
       "isActive": true,
-      "defaultCashier": "كاشير محل مودرن"
+      "defaultCashier": "كاشير معرض مودرن"
     },
     {
       "id": "b_nadi",
@@ -57,6 +57,7 @@
     }
   ],
   "transfers": [],
+  "messages": [],
   "bankAccounts": [
     {
       "id": "ba_nbe",

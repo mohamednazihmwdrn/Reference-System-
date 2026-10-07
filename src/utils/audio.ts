@@ -122,6 +122,78 @@ class SoundNotifier {
       // Audio playback silently failed
     }
   }
+
+  // WhatsApp-like chat message notification
+  public playMessageReceived() {
+    if (!this.soundEnabled) return;
+    try {
+      const ctx = this.getContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(1200, now + 0.08);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    } catch {
+      // Audio playback silently failed
+    }
+  }
+
+  // Walkie-talkie / PTT Radio incoming alert chime
+  public playWalkieTalkieChirp() {
+    if (!this.soundEnabled) return;
+    try {
+      const ctx = this.getContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+
+      // Tone 1 (High squelch chirp)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(1350, now);
+      gain1.gain.setValueAtTime(0.25, now);
+      gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.08);
+
+      // Tone 2 (Roger beep)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1750, now + 0.1);
+      gain2.gain.setValueAtTime(0.25, now + 0.1);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.1);
+      osc2.stop(now + 0.25);
+    } catch {
+      // Audio playback silently failed
+    }
+  }
+
+  // Play incoming voice note / walkie-talkie audio directly through speaker
+  public async playAudioData(audioUrl: string): Promise<void> {
+    try {
+      const audio = new Audio(audioUrl);
+      audio.volume = 1.0;
+      await audio.play();
+    } catch (err) {
+      console.warn('Auto-playback prevented by browser policy or audio format:', err);
+    }
+  }
 }
 
 export const soundManager = new SoundNotifier();

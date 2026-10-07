@@ -17,9 +17,35 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Data storage file
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// Serve uploaded photos statically
+app.use('/uploads', express.static(UPLOADS_DIR));
+
+// Helper to save base64 image to server disk file
+function saveBase64Image(dataStr: string): string {
+  if (!dataStr || typeof dataStr !== 'string') return dataStr;
+  if (!dataStr.startsWith('data:image/')) return dataStr; // already an HTTP / relative URL
+  try {
+    const matches = dataStr.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+    if (!matches || matches.length < 3) return dataStr;
+    const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+    const base64Data = matches[2];
+    const filename = `img_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+    const filePath = path.join(UPLOADS_DIR, filename);
+    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+    return `/uploads/${filename}`;
+  } catch (err) {
+    console.error('Failed to save base64 image to disk:', err);
+    return dataStr;
+  }
 }
 
 // Default Seed Data
@@ -27,36 +53,36 @@ const DEFAULT_SEED = {
   branches: [
     {
       id: 'b_rawda',
-      name: 'محل الروضة الشريفة',
+      name: 'معرض الروضة الشريفة',
       code: 'ST-01',
       city: 'الفرع الرئيسي',
       phone: '01029190615',
       pinCode: '1001',
       type: 'store',
       isActive: true,
-      defaultCashier: 'كاشير الروضة الشريفة',
+      defaultCashier: 'كاشير معرض الروضة الشريفة',
     },
     {
       id: 'b_safa',
-      name: 'محل صفا مكرم',
+      name: 'معرض صفا مكرم',
       code: 'ST-02',
       city: 'القاهرة',
       phone: '01022334455',
       pinCode: '2002',
       type: 'store',
       isActive: true,
-      defaultCashier: 'كاشير صفا مكرم',
+      defaultCashier: 'كاشير معرض صفا مكرم',
     },
     {
       id: 'b_modern',
-      name: 'محل مودرن',
+      name: 'معرض مودرن',
       code: 'ST-03',
       city: 'القاهرة',
       phone: '01033445566',
       pinCode: '3003',
       type: 'store',
       isActive: true,
-      defaultCashier: 'كاشير محل مودرن',
+      defaultCashier: 'كاشير معرض مودرن',
     },
     {
       id: 'b_nadi',
@@ -82,6 +108,7 @@ const DEFAULT_SEED = {
     },
   ],
   transfers: [] as Array<any>,
+  messages: [] as Array<any>,
   bankAccounts: [
     {
       id: 'ba_nbe',
@@ -141,10 +168,11 @@ function writeDb(data: typeof DEFAULT_SEED) {
 // Server-Sent Events (SSE) for Real-Time synchronization across separated phones
 let sseClients: express.Response[] = [];
 
-function notifyClients() {
+function notifyClients(payload: any = { type: 'UPDATE', timestamp: Date.now() }) {
+  const dataString = `data: ${JSON.stringify({ ...payload, timestamp: Date.now() })}\n\n`;
   sseClients.forEach((res) => {
     try {
-      res.write(`data: ${JSON.stringify({ type: 'UPDATE', timestamp: Date.now() })}\n\n`);
+      res.write(dataString);
     } catch {
       // client disconnected
     }
@@ -175,15 +203,26 @@ app.get('/api/transfers', (_req, res) => {
 
 app.post('/api/transfers', (req, res) => {
   const db = readDb();
+  const transferData = { ...req.body };
+
+  // Persist base64 images to server disk so network payloads and db remain tiny
+  if (transferData.screenshotUrl) {
+    transferData.screenshotUrl = saveBase64Image(transferData.screenshotUrl);
+  }
+  if (Array.isArray(transferData.images)) {
+    transferData.images = transferData.images.map((img: string) => saveBase64Image(img));
+  }
+
   const newTransfer = {
-    ...req.body,
-    id: req.body.id || `tx_${Date.now()}`,
-    createdAt: req.body.createdAt || new Date().toISOString(),
-    status: req.body.status || 'pending',
+    ...transferData,
+    id: transferData.id || `tx_${Date.now()}`,
+    createdAt: transferData.createdAt || new Date().toISOString(),
+    status: transferData.status || 'pending',
   };
 
   db.transfers = [newTransfer, ...(db.transfers || [])];
   writeDb(db);
+  notifyClients({ type: 'NEW_TRANSFER', transfer: newTransfer });
   res.status(201).json(newTransfer);
 });
 
@@ -196,7 +235,15 @@ app.put('/api/transfers/:id', (req, res) => {
     return res.status(404).json({ error: 'Transfer not found' });
   }
 
-  db.transfers[index] = { ...db.transfers[index], ...req.body };
+  const updateData = { ...req.body };
+  if (updateData.screenshotUrl) {
+    updateData.screenshotUrl = saveBase64Image(updateData.screenshotUrl);
+  }
+  if (Array.isArray(updateData.images)) {
+    updateData.images = updateData.images.map((img: string) => saveBase64Image(img));
+  }
+
+  db.transfers[index] = { ...db.transfers[index], ...updateData };
   writeDb(db);
   res.json(db.transfers[index]);
 });
@@ -221,6 +268,55 @@ app.delete('/api/transfers', (_req, res) => {
   const db = readDb();
   db.transfers = [];
   writeDb(db);
+  res.json({ success: true, count: 0 });
+});
+
+// 2. CHAT & WALKIE-TALKIE (PTT) API
+app.get('/api/messages', (_req, res) => {
+  const db = readDb();
+  res.json(db.messages || []);
+});
+
+app.post('/api/messages', (req, res) => {
+  const db = readDb();
+  const savedImageUrl = req.body.imageUrl ? saveBase64Image(req.body.imageUrl) : null;
+  const newMsg = {
+    id: req.body.id || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    senderId: req.body.senderId,
+    senderName: req.body.senderName, // e.g. "كاشير معرض صفا مكرم"
+    senderRole: req.body.senderRole,
+    targetBranchId: req.body.targetBranchId || 'all', // 'all' for company group chat, or specific branchId
+    text: req.body.text || '',
+    audioUrl: req.body.audioUrl || null, // voice note / walkie-talkie audio data
+    audioDuration: req.body.audioDuration || 0,
+    imageUrl: savedImageUrl,
+    isWalkieTalkie: Boolean(req.body.isWalkieTalkie), // instant push-to-talk broadcast
+    createdAt: new Date().toISOString(),
+  };
+
+  db.messages = [...(db.messages || []), newMsg];
+  // Retain last 250 messages
+  if (db.messages.length > 250) {
+    db.messages = db.messages.slice(-250);
+  }
+  writeDb(db);
+  notifyClients({ type: 'NEW_MESSAGE', message: newMsg });
+  res.status(201).json(newMsg);
+});
+
+app.delete('/api/messages/:id', (req, res) => {
+  const db = readDb();
+  const id = req.params.id;
+  db.messages = (db.messages || []).filter((m: { id: string }) => m.id !== id);
+  writeDb(db);
+  res.json({ success: true });
+});
+
+app.post('/api/messages/clear', (_req, res) => {
+  const db = readDb();
+  db.messages = [];
+  writeDb(db);
+  notifyClients({ type: 'MESSAGES_CLEARED' });
   res.json({ success: true, count: 0 });
 });
 

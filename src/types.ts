@@ -74,3 +74,18 @@ export interface BankStatementRecord {
   matchedTransferId?: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string; // e.g. "كاشير معرض صفا مكرم"
+  senderRole: UserRole;
+  targetBranchId: string; // 'all' for general company group, or specific branchId
+  text: string;
+  audioUrl?: string | null;
+  audioDuration?: number;
+  imageUrl?: string | null;
+  isWalkieTalkie?: boolean;
+  createdAt: string;
+}
+
+

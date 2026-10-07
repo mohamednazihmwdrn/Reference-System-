@@ -45,17 +45,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         name: AUDITOR_CREDENTIALS.name,
         role: 'auditor' as const,
         pinCode: AUDITOR_CREDENTIALS.pinCode,
-        userName: 'المراجع العام',
+        userName: 'المراجع المالي والإدارة',
       };
     }
     const b = branches.find((item) => item.id === selectedAccountId);
     if (b) {
+      const cleanRoleTitle = b.type === 'warehouse' 
+        ? (b.name.startsWith('مخزن') ? `أمين ${b.name}` : `أمين مخزن ${b.name}`)
+        : (b.name.startsWith('معرض') ? `كاشير ${b.name}` : `كاشير معرض ${b.name}`);
+
       return {
         id: b.id,
         name: b.name,
         role: 'branch_cashier' as const,
         pinCode: b.pinCode,
-        userName: b.defaultCashier || b.name,
+        userName: b.defaultCashier || cleanRoleTitle,
         branchId: b.id,
       };
     }
@@ -133,7 +137,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <span>تسجيل الدخول للمنظومة</span>
             </h2>
             <p className="text-xs text-slate-400">
-              اختر المحل أو المخزن واكتب كلمة السر للوصول إلى حسابك
+              اختر المعرض أو المخزن واكتب كلمة السر للوصول إلى حسابك
             </p>
           </div>
 
@@ -149,7 +153,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             {/* Field 1: Professional Account Dropdown */}
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-slate-300">
-                المحل / المخزن / الإدارة: <span className="text-red-400">*</span>
+                المعرض / المخزن / الإدارة: <span className="text-red-400">*</span>
               </label>
               
               <div className="relative">
@@ -161,10 +165,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   }}
                   className="w-full bg-slate-900 border border-slate-600 text-white rounded-2xl px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
                 >
-                  <optgroup label="المحلات التجارية">
+                  <optgroup label="المعارض">
                     {storeBranches.map((b) => (
                       <option key={b.id} value={b.id}>
-                        🏪 {b.name} ({b.code})
+                        🏪 {b.name} ({b.defaultCashier || b.code})
                       </option>
                     ))}
                   </optgroup>
@@ -172,7 +176,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   <optgroup label="المخازن والمستودعات">
                     {warehouseBranches.map((b) => (
                       <option key={b.id} value={b.id}>
-                        📦 {b.name} ({b.code})
+                        📦 {b.name} ({b.defaultCashier || b.code})
                       </option>
                     ))}
                   </optgroup>

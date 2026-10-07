@@ -22,6 +22,7 @@ import {
 import { TransferItem, Branch, BankAccount } from '../types';
 import { soundManager } from '../utils/audio';
 import { SAMPLE_RECEIPT_1, SAMPLE_RECEIPT_2, SAMPLE_INVOICE } from '../utils/storage';
+import { compressMultipleImages } from '../utils/imageCompressor';
 import { PhotoLightboxModal } from './PhotoLightboxModal';
 
 interface CashierUploadViewProps {
@@ -48,6 +49,7 @@ export const CashierUploadView: React.FC<CashierUploadViewProps> = ({
   // Images state: array of base64 strings or URLs
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [lastSentCode, setLastSentCode] = useState<string>('');
 
@@ -71,7 +73,7 @@ export const CashierUploadView: React.FC<CashierUploadViewProps> = ({
         if (items[i].type.indexOf('image') !== -1) {
           const file = items[i].getAsFile();
           if (file) {
-            readImageFiles([file]);
+            processImageFiles([file]);
             break;
           }
         }
@@ -81,31 +83,44 @@ export const CashierUploadView: React.FC<CashierUploadViewProps> = ({
     return () => window.removeEventListener('paste', handlePaste);
   }, [capturedImages]);
 
-  // Read multiple files
-  const readImageFiles = (files: FileList | File[]) => {
+  // Read and compress multiple files to prevent memory limit errors
+  const processImageFiles = async (files: FileList | File[]) => {
     const fileArray = Array.from(files).filter((f) => f.type.startsWith('image/'));
     if (fileArray.length === 0) return;
 
-    fileArray.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setCapturedImages((prev) => [...prev, event.target!.result as string]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    setIsCompressing(true);
+    try {
+      const compressedList = await compressMultipleImages(fileArray);
+      if (compressedList.length > 0) {
+        setCapturedImages((prev) => [...prev, ...compressedList]);
+        soundManager.playSuccess();
+      }
+    } catch (err) {
+      console.warn('Image compression fallback:', err);
+      // Fallback
+      fileArray.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            setCapturedImages((prev) => [...prev, event.target!.result as string]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const handleCameraChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      readImageFiles(e.target.files);
+      processImageFiles(e.target.files);
     }
   };
 
   const handleGalleryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      readImageFiles(e.target.files);
+      processImageFiles(e.target.files);
     }
   };
 
@@ -134,14 +149,18 @@ export const CashierUploadView: React.FC<CashierUploadViewProps> = ({
     const randomCode = `طلب #${Math.floor(1000 + Math.random() * 9000)}`;
     setLastSentCode(randomCode);
 
+    const cleanRoleTitle = currentBranch?.type === 'warehouse'
+      ? (currentBranch?.name.startsWith('مخزن') ? `أمين ${currentBranch?.name}` : `أمين مخزن ${currentBranch?.name}`)
+      : (currentBranch?.name.startsWith('معرض') ? `كاشير ${currentBranch?.name}` : `كاشير معرض ${currentBranch?.name}`);
+
     onAddTransfer({
-      branchName: currentBranch?.name || 'مخزن غير محدد',
+      branchName: currentBranch?.name || 'الفرع',
       branchId: currentBranch?.id || currentBranchId,
       invoiceNo: randomCode,
       amount: 0, // Accountant will verify and extract from the photos
       screenshotUrl: capturedImages[0], // primary for backwards compatibility
       images: capturedImages,
-      cashierName: currentBranch?.defaultCashier || 'كاشير الفرع',
+      cashierName: currentBranch?.defaultCashier || cleanRoleTitle,
       cashierNote: optionalNote.trim() || undefined,
     });
 
@@ -161,8 +180,16 @@ export const CashierUploadView: React.FC<CashierUploadViewProps> = ({
   const verifiedCount = branchTransfers.filter((t) => t.status === 'verified').length;
 
   return (
-    <div className="max-w-md mx-auto px-4 pt-3 pb-24 space-y-4">
+    <div className="max-w-md mx-auto px-4 pt-3 pb-36 sm:pb-44 space-y-4">
       
+      {/* Processing & Compression Loader */}
+      {isCompressing && (
+        <div className="bg-blue-600 text-white rounded-2xl p-3.5 shadow-md flex items-center justify-center gap-2.5 text-xs font-bold animate-pulse">
+          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          <span>جاري معالجة وضغط الصور بدقة عالية لتسريع الإرسال ومنع امتلاء الذاكرة...</span>
+        </div>
+      )}
+
       {/* Success Notification Banner */}
       {showSuccessToast && (
         <div className="bg-emerald-600 text-white rounded-2xl p-4 shadow-lg flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-4 duration-300">

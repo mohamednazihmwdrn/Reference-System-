@@ -44,7 +44,7 @@ export const BranchFeedView: React.FC<BranchFeedViewProps> = ({
   const rejectedCount = branchTransfers.filter((t) => t.status === 'rejected').length;
 
   return (
-    <div className="max-w-md mx-auto px-4 pt-3 pb-24 space-y-4">
+    <div className="max-w-md mx-auto px-4 pt-3 pb-36 sm:pb-44 space-y-4">
       
       {/* Top Banner */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs flex items-center justify-between">
