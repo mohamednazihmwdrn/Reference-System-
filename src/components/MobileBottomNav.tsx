@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, ClipboardList, ShieldCheck, Settings, Landmark, Radio } from 'lucide-react';
+import { Camera, ClipboardList, ShieldCheck, Settings, Landmark, MessageSquare } from 'lucide-react';
 import { ActiveTab } from './Header';
 import { UserRole } from '../types';
 
@@ -18,7 +18,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 }) => {
   const isAuditor = userRole === 'auditor';
 
-  // Branch Cashier Navigation: 3 buttons (Camera, Chat & Walkie-Talkie, Branch Feed)
+  // Branch Cashier Navigation: 3 buttons (Camera, Chat & Voice Notes, Branch Feed)
   if (!isAuditor) {
     return (
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-xl pb-safe">
@@ -40,20 +40,20 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             <span className="text-[11px] mt-0.5 tracking-tight font-bold">تصوير فوري</span>
           </button>
 
-          {/* Cashier Tab 2: Walkie-Talkie & Chat */}
+          {/* Cashier Tab 2: Voice Notes & Chat */}
           <button
             type="button"
             onClick={() => setActiveTab('chat')}
             className={`flex flex-col items-center justify-center h-full min-h-[44px] py-1 transition-transform active:scale-95 cursor-pointer ${
               activeTab === 'chat'
-                ? 'text-amber-600 font-bold'
+                ? 'text-blue-600 font-bold'
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <div className={`p-1.5 rounded-xl transition-colors ${activeTab === 'chat' ? 'bg-amber-100 text-amber-700' : ''}`}>
-              <Radio className="w-5 h-5" />
+            <div className={`p-1.5 rounded-xl transition-colors ${activeTab === 'chat' ? 'bg-blue-100 text-blue-700' : ''}`}>
+              <MessageSquare className="w-5 h-5" />
             </div>
-            <span className="text-[11px] mt-0.5 tracking-tight font-bold">لاسلكي وشات 📻</span>
+            <span className="text-[11px] mt-0.5 tracking-tight font-bold">شات وتسجيلات 💬</span>
           </button>
 
           {/* Cashier Tab 3: Branch Feed (Only this branch's history) */}
@@ -103,20 +103,20 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <span className="text-[10px] sm:text-[11px] mt-0.5 tracking-tight">الاعتماد والأرشيف</span>
         </button>
 
-        {/* Auditor Tab 2: Walkie-Talkie & Chat */}
+        {/* Auditor Tab 2: Voice Notes & Chat */}
         <button
           type="button"
           onClick={() => setActiveTab('chat')}
           className={`flex flex-col items-center justify-center h-full min-h-[44px] py-1 transition-transform active:scale-95 cursor-pointer ${
             activeTab === 'chat'
-              ? 'text-amber-600 font-bold'
+              ? 'text-blue-600 font-bold'
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <div className={`p-1 rounded-xl transition-colors ${activeTab === 'chat' ? 'bg-amber-100 text-amber-700' : ''}`}>
-            <Radio className="w-5 h-5" />
+          <div className={`p-1 rounded-xl transition-colors ${activeTab === 'chat' ? 'bg-blue-100 text-blue-700' : ''}`}>
+            <MessageSquare className="w-5 h-5" />
           </div>
-          <span className="text-[10px] sm:text-[11px] mt-0.5 tracking-tight font-bold">لاسلكي وشات</span>
+          <span className="text-[10px] sm:text-[11px] mt-0.5 tracking-tight font-bold">شات وصوتيات 💬</span>
         </button>
 
         {/* Auditor Tab 3: Bank Statement Reconciliation */}

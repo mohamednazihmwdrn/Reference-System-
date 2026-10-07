@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   Shield,
   Settings,
-  Radio
+  MessageSquare
 } from 'lucide-react';
 import { Branch, UserSession } from '../types';
 import { PWAInstallPrompt } from './PWAInstallPrompt';
@@ -75,19 +75,19 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Header Actions */}
           <div className="flex items-center gap-1.5">
-            {/* Walkie-Talkie & Chat Quick Trigger */}
+            {/* Voice Chat & Messaging Quick Trigger */}
             <button
               type="button"
               onClick={() => setActiveTab('chat')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'chat'
-                  ? 'bg-amber-500 text-slate-950 shadow-sm shadow-amber-500/30'
-                  : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
               }`}
-              title="اللاسلكي الفوري وغرفة الدردشة المباشرة"
+              title="غرفة المحادثات والتسجيلات الصوتية"
             >
-              <Radio className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">لاسلكي وشات</span>
+              <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
+              <span className="hidden sm:inline">شات وتسجيلات</span>
             </button>
 
             {/* Install PWA Prompt button (auto-hides when running standalone) */}
