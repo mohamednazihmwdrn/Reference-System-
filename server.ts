@@ -182,13 +182,27 @@ function notifyClients(payload: any = { type: 'UPDATE', timestamp: Date.now() })
 // SSE endpoint
 app.get('/api/events', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders?.();
+
+  // Initial connection handshake
+  res.write(`data: ${JSON.stringify({ type: 'CONNECTED', timestamp: Date.now() })}\n\n`);
 
   sseClients.push(res);
 
+  // Keep-alive heartbeat every 15s to keep mobile proxies and firewalls open
+  const keepAliveInterval = setInterval(() => {
+    try {
+      res.write(': keepalive\n\n');
+    } catch {
+      clearInterval(keepAliveInterval);
+    }
+  }, 15000);
+
   req.on('close', () => {
+    clearInterval(keepAliveInterval);
     sseClients = sseClients.filter((client) => client !== res);
   });
 });

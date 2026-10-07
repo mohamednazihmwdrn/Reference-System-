@@ -1,0 +1,184 @@
+{
+  "entities": {
+    "Transfer": {
+      "title": "Transfer",
+      "description": "An InstaPay payment transfer uploaded by a showroom or warehouse cashier and verified by the accountant",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique transfer identifier"
+        },
+        "branchId": {
+          "type": "string",
+          "description": "Identifier of the branch/showroom"
+        },
+        "branchName": {
+          "type": "string",
+          "description": "Name of the showroom or warehouse"
+        },
+        "invoiceNo": {
+          "type": "string",
+          "description": "Tracking code or invoice reference"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Transfer amount in EGP"
+        },
+        "screenshotUrl": {
+          "type": "string",
+          "description": "Primary receipt screenshot URL or base64"
+        },
+        "images": {
+          "type": "array",
+          "description": "Array of invoice and InstaPay receipt image URLs"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "verified", "rejected"],
+          "description": "Verification status of the transfer"
+        },
+        "cashierName": {
+          "type": "string",
+          "description": "Title of the cashier or warehouse custodian"
+        },
+        "cashierNote": {
+          "type": "string",
+          "description": "Optional notes from the cashier"
+        },
+        "verifiedBy": {
+          "type": "string",
+          "description": "Name of the auditor/accountant who verified this"
+        },
+        "verifiedAt": {
+          "type": "string",
+          "description": "ISO timestamp of verification"
+        },
+        "accountantNotes": {
+          "type": "string",
+          "description": "Notes from the accountant"
+        },
+        "rejectionReason": {
+          "type": "string",
+          "description": "Reason for rejecting the transfer"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO creation timestamp"
+        }
+      },
+      "required": ["id", "branchId", "branchName", "invoiceNo", "status", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A chat or instant walkie-talkie audio broadcast message between showrooms, warehouses, and auditor",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique message identifier"
+        },
+        "senderId": {
+          "type": "string",
+          "description": "Identifier of the sender branch or auditor"
+        },
+        "senderName": {
+          "type": "string",
+          "description": "Designation of sender (e.g. كاشير معرض صفا مكرم)"
+        },
+        "senderRole": {
+          "type": "string",
+          "description": "Role of the sender"
+        },
+        "targetBranchId": {
+          "type": "string",
+          "description": "Destination branch ID or 'all' for group"
+        },
+        "text": {
+          "type": "string",
+          "description": "Text message content"
+        },
+        "audioUrl": {
+          "type": "string",
+          "description": "Audio data URL for voice note or walkie-talkie"
+        },
+        "audioDuration": {
+          "type": "number",
+          "description": "Duration in seconds"
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Attached image URL"
+        },
+        "isWalkieTalkie": {
+          "type": "boolean",
+          "description": "True if instant Push-to-Talk broadcast"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO creation timestamp"
+        }
+      },
+      "required": ["id", "senderId", "senderName", "targetBranchId", "createdAt"]
+    },
+    "Branch": {
+      "title": "Branch",
+      "description": "A showroom or warehouse location of Al-Rawdah Al-Sharifah",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique branch identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Showroom or warehouse name"
+        },
+        "code": {
+          "type": "string",
+          "description": "Branch code"
+        },
+        "city": {
+          "type": "string",
+          "description": "City or governorate"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Contact phone number"
+        },
+        "pinCode": {
+          "type": "string",
+          "description": "Login PIN for the branch account"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["store", "warehouse"],
+          "description": "Store or warehouse"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Active status"
+        },
+        "defaultCashier": {
+          "type": "string",
+          "description": "Role title"
+        }
+      },
+      "required": ["id", "name", "code", "pinCode", "type", "isActive"]
+    }
+  },
+  "firestore": {
+    "/transfers/{transferId}": {
+      "schema": "Transfer",
+      "description": "Collection of payment transfers and InstaPay receipts"
+    },
+    "/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Collection of real-time chat and walkie-talkie broadcasts"
+    },
+    "/branches/{branchId}": {
+      "schema": "Branch",
+      "description": "Collection of company showrooms and warehouses"
+    }
+  }
+}

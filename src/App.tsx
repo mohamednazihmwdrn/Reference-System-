@@ -18,7 +18,7 @@ import { SingleTransferVoucherModal } from './components/SingleTransferVoucherMo
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { PWAUpdateToast } from './components/PWAUpdateToast';
 import { CompanyChatView } from './components/CompanyChatView';
-import { Radio, Bell, X, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { Radio, Bell, X, MessageSquare, CheckCircle2, Volume2 } from 'lucide-react';
 
 import { TransferItem, Branch, BankAccount, UserSession } from './types';
 import {
@@ -123,10 +123,16 @@ export default function App() {
     id: string;
     text: string;
     senderName?: string;
+    senderId?: string;
     type: 'transfer' | 'walkie' | 'chat';
     imageUrl?: string;
+    audioUrl?: string;
     transfer?: TransferItem;
   } | null>(null);
+
+  // Targeted channel for direct chat reply from incoming notification
+  const [chatTargetChannel, setChatTargetChannel] = useState<string>('all');
+  const [chatAutoOpenWalkie, setChatAutoOpenWalkie] = useState<boolean>(false);
 
   // Request browser Notification permissions on launch
   useEffect(() => {
@@ -194,10 +200,12 @@ export default function App() {
       if (data && data.length > 0) setBranches(data);
     });
 
-    // Real-time live synchronization (SSE + Polling)
+    // Real-time live synchronization (Firebase Cloud Firestore + SSE + Polling)
     const unsubscribe = subscribeToLiveUpdates(async (eventData?: any) => {
-      // 1. Check for incoming transfers
-      const serverTransfers = await apiFetchTransfers();
+      // 1. Check for incoming transfers (Directly from Firestore push or server fetch)
+      const serverTransfers = (eventData?.type === 'NEW_TRANSFER' && Array.isArray(eventData.transfers))
+        ? eventData.transfers
+        : await apiFetchTransfers();
       if (Array.isArray(serverTransfers)) {
         setTransfers((prev) => {
           // Play chime & alert if new items arrived from another phone
@@ -234,10 +242,12 @@ export default function App() {
         const msg = eventData.message;
         const currentUserId = currentSession?.role === 'auditor' ? 'auditor_main' : currentSession?.branchId;
         
-        // Notify if message is from another phone
-        if (msg.senderId !== currentUserId) {
+        // Notify if message is relevant for this device
+        const isForMe = msg.targetBranchId === 'all' || msg.targetBranchId === currentUserId;
+
+        if (msg.senderId !== currentUserId && isForMe) {
           if ('vibrate' in navigator) {
-            navigator.vibrate([200, 100, 200]);
+            navigator.vibrate([200, 100, 200, 100, 300]);
           }
 
           if (msg.isWalkieTalkie) {
@@ -258,6 +268,8 @@ export default function App() {
               id: String(Date.now()),
               text: `🎙️ بث لاسلكي مباشر وارد الآن من: ${msg.senderName}`,
               senderName: msg.senderName,
+              senderId: msg.senderId,
+              audioUrl: msg.audioUrl || undefined,
               type: 'walkie',
             });
           } else {
@@ -274,6 +286,7 @@ export default function App() {
               id: String(Date.now()),
               text: `💬 رسالة جديدة من: ${msg.senderName}`,
               senderName: msg.senderName,
+              senderId: msg.senderId,
               type: 'chat',
               imageUrl: msg.imageUrl || undefined,
             });
@@ -571,16 +584,48 @@ export default function App() {
               </button>
             )}
 
-            {(liveAlertBanner.type === 'walkie' || liveAlertBanner.type === 'chat') && (
+            {liveAlertBanner.type === 'walkie' && (
+              <>
+                {liveAlertBanner.audioUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundManager.playAudioData(liveAlertBanner.audioUrl!);
+                    }}
+                    className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 text-xs rounded-xl font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                    <span>استمع 🔊</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChatTargetChannel(liveAlertBanner.senderId || 'all');
+                    setChatAutoOpenWalkie(true);
+                    handleTabChange('chat');
+                    setLiveAlertBanner(null);
+                  }}
+                  className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs rounded-xl font-black transition-all cursor-pointer shadow-xs flex items-center gap-1"
+                >
+                  <Radio className="w-3.5 h-3.5" />
+                  <span>رد باللاسلكي ⚡</span>
+                </button>
+              </>
+            )}
+
+            {liveAlertBanner.type === 'chat' && (
               <button
                 type="button"
                 onClick={() => {
+                  setChatTargetChannel(liveAlertBanner.senderId || 'all');
+                  setChatAutoOpenWalkie(false);
                   handleTabChange('chat');
                   setLiveAlertBanner(null);
                 }}
                 className="px-2.5 py-1.5 bg-white/20 hover:bg-white/30 active:scale-95 text-white text-xs rounded-xl font-bold transition-all cursor-pointer"
               >
-                {liveAlertBanner.type === 'walkie' ? 'فتح اللاسلكي والرد' : 'فتح المحادثة'}
+                رد على الرسالة 💬
               </button>
             )}
 
@@ -640,6 +685,8 @@ export default function App() {
           <CompanyChatView
             currentSession={currentSession}
             branches={branches}
+            initialTargetChannel={chatTargetChannel}
+            autoOpenWalkieTalkie={chatAutoOpenWalkie}
             onOpenVerifyModal={(tId) => {
               const item = transfers.find((t) => t.id === tId);
               if (item) openInspectingTransfer(item);

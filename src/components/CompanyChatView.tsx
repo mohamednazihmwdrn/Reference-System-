@@ -22,10 +22,12 @@ import {
   Headphones,
   Signal,
   Wifi,
-  ChevronDown
+  ChevronDown,
+  PhoneForwarded
 } from 'lucide-react';
 import { ChatMessage, Branch, UserSession } from '../types';
 import { apiFetchMessages, apiSendMessage, apiClearMessages } from '../utils/api';
+import { subscribeToChatMessages } from '../utils/firebase';
 import { soundManager } from '../utils/audio';
 import { compressImage } from '../utils/imageCompressor';
 import { PhotoLightboxModal } from './PhotoLightboxModal';
@@ -33,27 +35,32 @@ import { PhotoLightboxModal } from './PhotoLightboxModal';
 interface CompanyChatViewProps {
   currentSession: UserSession;
   branches: Branch[];
+  initialTargetChannel?: string;
+  autoOpenWalkieTalkie?: boolean;
   onOpenVerifyModal?: (transferId: string) => void;
 }
 
 export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
   currentSession,
   branches,
+  initialTargetChannel,
+  autoOpenWalkieTalkie,
 }) => {
   // Target Channel: 'all' (company group) or specific branchId / 'auditor_main'
-  const [selectedTarget, setSelectedTarget] = useState<string>('all');
+  const [selectedTarget, setSelectedTarget] = useState<string>(initialTargetChannel || 'all');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState<string>('');
   const [isSending, setIsSending] = useState<boolean>(false);
   const [lightboxImage, setLightboxImage] = useState<{ url: string; title: string } | null>(null);
 
   // Dedicated Walkie-Talkie Instant PTT Modal
-  const [isWalkieTalkieModalOpen, setIsWalkieTalkieModalOpen] = useState<boolean>(false);
+  const [isWalkieTalkieModalOpen, setIsWalkieTalkieModalOpen] = useState<boolean>(Boolean(autoOpenWalkieTalkie));
 
   // Audio recording state (Voice Notes & Walkie-Talkie PTT)
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [isWalkieRecording, setIsWalkieRecording] = useState<boolean>(false);
   const [recordSeconds, setRecordSeconds] = useState<number>(0);
+  const startTimeRef = useRef<number>(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -72,16 +79,45 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
     ? 'المراجع المالي والإدارة' 
     : currentSession.userName || currentSession.branchName;
 
-  // Initial load & Polling
+  // React to prop changes (e.g. from banner click)
+  useEffect(() => {
+    if (initialTargetChannel) {
+      setSelectedTarget(initialTargetChannel);
+    }
+    if (autoOpenWalkieTalkie) {
+      setIsWalkieTalkieModalOpen(true);
+    }
+  }, [initialTargetChannel, autoOpenWalkieTalkie]);
+
+  // Initial load & Real-time Firestore Sync
   const loadMessages = async () => {
     const list = await apiFetchMessages();
-    setMessages(list);
+    if (Array.isArray(list) && list.length > 0) {
+      setMessages(list);
+    }
   };
 
   useEffect(() => {
     loadMessages();
-    const interval = setInterval(loadMessages, 2200);
-    return () => clearInterval(interval);
+
+    // Instant real-time listener from Firebase Firestore across all devices
+    let unsubFirestore: (() => void) | null = null;
+    try {
+      unsubFirestore = subscribeToChatMessages((firebaseMessages) => {
+        if (Array.isArray(firebaseMessages)) {
+          setMessages(firebaseMessages);
+        }
+      });
+    } catch (err) {
+      console.warn('Chat Firestore listener fallback:', err);
+    }
+
+    // Polling fallback every 3s
+    const interval = setInterval(loadMessages, 3000);
+    return () => {
+      if (unsubFirestore) unsubFirestore();
+      clearInterval(interval);
+    };
   }, []);
 
   // Auto-scroll on new messages
@@ -99,6 +135,15 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
     const isReceivedFromTarget = m.targetBranchId === currentSenderId && m.senderId === selectedTarget;
     return isSentToTarget || isReceivedFromTarget;
   });
+
+  // Calculate badge for incoming messages per channel
+  const getChannelBadge = (branchId: string) => {
+    const incoming = messages.filter(
+      (m) => m.senderId === branchId && m.targetBranchId === currentSenderId
+    );
+    const hasWalkie = incoming.some((m) => m.isWalkieTalkie);
+    return { count: incoming.length, hasWalkie };
+  };
 
   // Target title & role label
   const getTargetDetails = () => {
@@ -192,7 +237,24 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
-      const mediaRecorder = new MediaRecorder(stream);
+      startTimeRef.current = Date.now();
+
+      // Detect best supported MIME type across mobile devices (iOS Safari, Android Chrome)
+      let chosenMime = '';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          chosenMime = 'audio/mp4';
+        } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          chosenMime = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+          chosenMime = 'audio/webm';
+        }
+      }
+
+      const mediaRecorder = chosenMime 
+        ? new MediaRecorder(stream, { mimeType: chosenMime }) 
+        : new MediaRecorder(stream);
+
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (e) => {
@@ -203,7 +265,10 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
 
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const actualMime = mediaRecorder.mimeType || chosenMime || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: actualMime });
+        const finalDuration = Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000));
+
         const reader = new FileReader();
         reader.onloadend = async () => {
           const base64Audio = reader.result as string;
@@ -214,7 +279,7 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
             targetBranchId: selectedTarget,
             text: asWalkieTalkie ? '🎙️ بث لاسلكي فوري مباشر' : '🎵 تسجيل صوتي',
             audioUrl: base64Audio,
-            audioDuration: recordSeconds,
+            audioDuration: finalDuration,
             isWalkieTalkie: asWalkieTalkie,
             createdAt: new Date().toISOString(),
           };
@@ -274,6 +339,7 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
     }
 
     const audio = new Audio(url);
+    audio.setAttribute('playsinline', 'true');
     activeAudioRef.current = audio;
     setPlayingAudioId(id);
 
@@ -325,7 +391,7 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
             <button
               type="button"
               onClick={() => setSelectedTarget('auditor_main')}
-              className={`px-3.5 py-2 rounded-2xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
+              className={`px-3.5 py-2 rounded-2xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 relative ${
                 selectedTarget === 'auditor_main'
                   ? 'bg-emerald-600 text-white shadow-xs scale-102'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -333,6 +399,9 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
             >
               <ShieldCheck className="w-4 h-4" />
               <span>المراجع المالي والإدارة</span>
+              {getChannelBadge('auditor_main').count > 0 && (
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+              )}
             </button>
           )}
 
@@ -341,12 +410,14 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
             // Don't show myself in target list
             if (b.id === currentSession.branchId) return null;
             const isStore = b.type === 'store';
+            const badge = getChannelBadge(b.id);
+
             return (
               <button
                 key={b.id}
                 type="button"
                 onClick={() => setSelectedTarget(b.id)}
-                className={`px-3.5 py-2 rounded-2xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
+                className={`px-3.5 py-2 rounded-2xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 relative ${
                   selectedTarget === b.id
                     ? 'bg-slate-900 text-white shadow-xs scale-102'
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -354,6 +425,14 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
               >
                 {isStore ? <Store className="w-4 h-4 text-blue-500" /> : <Package className="w-4 h-4 text-amber-500" />}
                 <span>{b.name}</span>
+                {badge.hasWalkie && (
+                  <span className="bg-amber-500 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-bold animate-bounce">
+                    🎙️ جديد
+                  </span>
+                )}
+                {!badge.hasWalkie && badge.count > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                )}
               </button>
             );
           })}
@@ -498,6 +577,24 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
                           ></div>
                         </div>
                       </div>
+
+                      {/* Quick Reply Button on direct messages */}
+                      {!isMe && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (msg.senderId !== 'all') {
+                              setSelectedTarget(msg.senderId);
+                            }
+                            setIsWalkieTalkieModalOpen(true);
+                          }}
+                          className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg text-[10px] flex items-center gap-1 shrink-0 cursor-pointer shadow-xs active:scale-95 transition-transform"
+                          title="رد سريع باللاسلكي"
+                        >
+                          <PhoneForwarded className="w-3 h-3" />
+                          <span>رد</span>
+                        </button>
+                      )}
                     </div>
                   )}
 

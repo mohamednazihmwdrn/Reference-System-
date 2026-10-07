@@ -7,6 +7,14 @@ import {
   DEFAULT_BRANCHES, 
   INITIAL_TRANSFERS 
 } from './storage';
+import { 
+  saveTransferToFirestore, 
+  subscribeToTransfers, 
+  sendMessageToFirestore, 
+  subscribeToChatMessages, 
+  saveBranchToFirestore, 
+  subscribeToBranches 
+} from './firebase';
 
 // API client for cross-device real-time communication between separated phones
 export async function apiFetchTransfers(): Promise<TransferItem[]> {
@@ -32,6 +40,11 @@ export async function apiCreateTransfer(
     status: 'pending',
   };
 
+  // 1. Immediately push to Firebase Firestore for instant 0-second sync across all devices
+  saveTransferToFirestore(newTransfer).catch((err) => {
+    console.warn('Firestore live push fallback:', err);
+  });
+
   try {
     const res = await fetch('/api/transfers', {
       method: 'POST',
@@ -54,6 +67,16 @@ export async function apiUpdateTransfer(
   id: string,
   updates: Partial<TransferItem>
 ): Promise<TransferItem | null> {
+  // Push update to Firebase Firestore immediately
+  const local = loadTransfers();
+  const existing = local.find((t) => t.id === id);
+  if (existing) {
+    const merged = { ...existing, ...updates };
+    saveTransferToFirestore(merged).catch((err) => {
+      console.warn('Firestore update fallback:', err);
+    });
+  }
+
   try {
     const res = await fetch(`/api/transfers/${id}`, {
       method: 'PUT',
@@ -64,7 +87,6 @@ export async function apiUpdateTransfer(
     return await res.json();
   } catch (err) {
     console.warn('Network error updating transfer, saving locally:', err);
-    const local = loadTransfers();
     const updated = local.map((t) => (t.id === id ? { ...t, ...updates } : t));
     saveTransfers(updated);
     return updated.find((t) => t.id === id) || null;
@@ -101,6 +123,8 @@ export async function apiCreateBranch(branch: Omit<Branch, 'id'>): Promise<Branc
     id: `b_${Date.now()}`,
   };
 
+  saveBranchToFirestore(newBranch).catch((err) => console.warn('Firestore branch write:', err));
+
   try {
     const res = await fetch('/api/branches', {
       method: 'POST',
@@ -121,6 +145,12 @@ export async function apiUpdateBranch(
   id: string,
   updates: Partial<Branch>
 ): Promise<Branch | null> {
+  const local = loadBranches();
+  const existing = local.find((b) => b.id === id);
+  if (existing) {
+    saveBranchToFirestore({ ...existing, ...updates }).catch((err) => console.warn('Firestore branch update:', err));
+  }
+
   try {
     const res = await fetch(`/api/branches/${id}`, {
       method: 'PUT',
@@ -130,7 +160,6 @@ export async function apiUpdateBranch(
     if (!res.ok) throw new Error('Failed to update branch');
     return await res.json();
   } catch (err) {
-    const local = loadBranches();
     const updated = local.map((b) => (b.id === id ? { ...b, ...updates } : b));
     saveBranches(updated);
     return updated.find((b) => b.id === id) || null;
@@ -162,17 +191,36 @@ export async function apiFetchMessages(): Promise<ChatMessage[]> {
 }
 
 export async function apiSendMessage(msg: Partial<ChatMessage>): Promise<ChatMessage | null> {
+  const finalMsg: ChatMessage = {
+    id: msg.id || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    senderId: msg.senderId || 'unknown',
+    senderName: msg.senderName || 'مستخدم',
+    senderRole: msg.senderRole || 'branch_cashier',
+    targetBranchId: msg.targetBranchId || 'all',
+    text: msg.text || '',
+    audioUrl: msg.audioUrl,
+    audioDuration: msg.audioDuration,
+    imageUrl: msg.imageUrl,
+    isWalkieTalkie: !!msg.isWalkieTalkie,
+    createdAt: msg.createdAt || new Date().toISOString(),
+  };
+
+  // 1. Instantly push to Firebase Firestore for instant global cross-device broadcast
+  sendMessageToFirestore(finalMsg).catch((err) => {
+    console.warn('Firestore instant message send fallback:', err);
+  });
+
   try {
     const res = await fetch('/api/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(msg),
+      body: JSON.stringify(finalMsg),
     });
     if (!res.ok) throw new Error('Failed to send message');
     return await res.json();
   } catch (err) {
-    console.error('Failed to send message:', err);
-    return null;
+    console.error('Failed to send message to server:', err);
+    return finalMsg;
   }
 }
 
@@ -185,11 +233,62 @@ export async function apiClearMessages(): Promise<boolean> {
   }
 }
 
-// Live real-time listener across separated phones (SSE with Polling fallback)
+// Live real-time listener across separated phones (Firebase Cloud Firestore + SSE with Polling fallback)
 export function subscribeToLiveUpdates(onUpdate: (eventData?: any) => void): () => void {
   let eventSource: EventSource | null = null;
   let pollInterval: ReturnType<typeof setInterval> | null = null;
+  let unsubFirestoreChat: (() => void) | null = null;
+  let unsubFirestoreTransfers: (() => void) | null = null;
+  let unsubFirestoreBranches: (() => void) | null = null;
 
+  // Track known message IDs to only notify on genuinely new messages
+  let knownMessageIds = new Set<string>();
+  let initialMessagesLoaded = false;
+
+  // 1. Firebase Firestore Instant Real-time Listeners (WebSockets / gRPC Cloud Push)
+  try {
+    unsubFirestoreChat = subscribeToChatMessages((messages) => {
+      if (!initialMessagesLoaded) {
+        messages.forEach((m) => knownMessageIds.add(m.id));
+        initialMessagesLoaded = true;
+        return;
+      }
+
+      // Check for newly arrived messages
+      for (const m of messages) {
+        if (!knownMessageIds.has(m.id)) {
+          knownMessageIds.add(m.id);
+          // Trigger instant live walkie-talkie / chat alert
+          onUpdate({
+            type: 'NEW_MESSAGE',
+            message: m,
+          });
+        }
+      }
+    });
+
+    unsubFirestoreTransfers = subscribeToTransfers((transfers) => {
+      if (Array.isArray(transfers) && transfers.length > 0) {
+        onUpdate({
+          type: 'NEW_TRANSFER',
+          transfers: transfers,
+        });
+      }
+    });
+
+    unsubFirestoreBranches = subscribeToBranches((branches) => {
+      if (Array.isArray(branches) && branches.length > 0) {
+        onUpdate({
+          type: 'BRANCHES_UPDATE',
+          branches: branches,
+        });
+      }
+    });
+  } catch (err) {
+    console.warn('Firebase Firestore listeners initialization notice:', err);
+  }
+
+  // 2. Server-Sent Events (SSE) fallback
   try {
     if (typeof window !== 'undefined' && 'EventSource' in window) {
       eventSource = new EventSource('/api/events');
@@ -209,12 +308,15 @@ export function subscribeToLiveUpdates(onUpdate: (eventData?: any) => void): () 
     // SSE not supported
   }
 
-  // Backup polling every 2.5 seconds to guarantee 100% sync even on weak mobile cellular connections
+  // 3. Backup polling every 3 seconds to guarantee 100% sync even on low network
   pollInterval = setInterval(() => {
     onUpdate();
-  }, 2500);
+  }, 3000);
 
   return () => {
+    if (unsubFirestoreChat) unsubFirestoreChat();
+    if (unsubFirestoreTransfers) unsubFirestoreTransfers();
+    if (unsubFirestoreBranches) unsubFirestoreBranches();
     if (eventSource) {
       eventSource.close();
     }

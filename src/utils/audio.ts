@@ -2,9 +2,29 @@
 class SoundNotifier {
   private ctx: AudioContext | null = null;
   private soundEnabled: boolean = true;
+  private isUnlocked: boolean = false;
 
   constructor() {
-    // AudioContext will be initialized on first user interaction
+    if (typeof window !== 'undefined') {
+      const unlock = () => {
+        if (this.isUnlocked) return;
+        this.isUnlocked = true;
+        try {
+          const ctx = this.getContext();
+          if (ctx && ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+          }
+          // Play a fraction of a millisecond of silence to unlock HTMLAudioElement
+          const silentAudio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
+          silentAudio.volume = 0.01;
+          silentAudio.play().catch(() => {});
+        } catch {}
+      };
+
+      window.addEventListener('click', unlock, { once: true, passive: true });
+      window.addEventListener('touchstart', unlock, { once: true, passive: true });
+      window.addEventListener('keydown', unlock, { once: true, passive: true });
+    }
   }
 
   private getContext(): AudioContext | null {
@@ -185,13 +205,20 @@ class SoundNotifier {
   }
 
   // Play incoming voice note / walkie-talkie audio directly through speaker
-  public async playAudioData(audioUrl: string): Promise<void> {
+  public async playAudioData(audioUrl: string, onPlayFailed?: () => void): Promise<boolean> {
     try {
-      const audio = new Audio(audioUrl);
+      const audio = new Audio();
+      audio.setAttribute('playsinline', 'true');
+      audio.src = audioUrl;
       audio.volume = 1.0;
       await audio.play();
+      return true;
     } catch (err) {
-      console.warn('Auto-playback prevented by browser policy or audio format:', err);
+      console.warn('Auto-playback restricted by mobile browser policy:', err);
+      if (onPlayFailed) {
+        onPlayFailed();
+      }
+      return false;
     }
   }
 }

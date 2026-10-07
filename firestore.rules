@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Transfer Validation
+    function isValidTransfer(data) {
+      return data.keys().hasAll(['id', 'branchId', 'branchName', 'invoiceNo', 'status', 'createdAt']) &&
+        data.id is string && isValidId(data.id) &&
+        data.branchId is string && data.branchId.size() <= 128 &&
+        data.branchName is string && data.branchName.size() <= 150 &&
+        data.invoiceNo is string && data.invoiceNo.size() <= 128 &&
+        data.status in ['pending', 'verified', 'rejected'] &&
+        data.createdAt is string && data.createdAt.size() <= 50 &&
+        (!('amount' in data) || (data.amount is number && data.amount >= 0)) &&
+        (!('cashierName' in data) || (data.cashierName is string && data.cashierName.size() <= 150)) &&
+        (!('cashierNote' in data) || (data.cashierNote is string && data.cashierNote.size() <= 2000)) &&
+        (!('verifiedBy' in data) || (data.verifiedBy is string && data.verifiedBy.size() <= 150)) &&
+        (!('verifiedAt' in data) || (data.verifiedAt is string && data.verifiedAt.size() <= 50)) &&
+        (!('accountantNotes' in data) || (data.accountantNotes is string && data.accountantNotes.size() <= 2000)) &&
+        (!('rejectionReason' in data) || (data.rejectionReason is string && data.rejectionReason.size() <= 2000)) &&
+        (!('screenshotUrl' in data) || (data.screenshotUrl is string && data.screenshotUrl.size() <= 500000)) &&
+        (!('images' in data) || (data.images is list && data.images.size() <= 10));
+    }
+
+    // Chat / Walkie-talkie Message Validation
+    function isValidChatMessage(data) {
+      return data.keys().hasAll(['id', 'senderId', 'senderName', 'targetBranchId', 'createdAt']) &&
+        data.id is string && isValidId(data.id) &&
+        data.senderId is string && data.senderId.size() <= 128 &&
+        data.senderName is string && data.senderName.size() <= 150 &&
+        data.targetBranchId is string && data.targetBranchId.size() <= 128 &&
+        data.createdAt is string && data.createdAt.size() <= 50 &&
+        (!('text' in data) || (data.text is string && data.text.size() <= 2000)) &&
+        (!('audioUrl' in data) || (data.audioUrl is string && data.audioUrl.size() <= 1000000)) &&
+        (!('audioDuration' in data) || (data.audioDuration is number && data.audioDuration >= 0)) &&
+        (!('isWalkieTalkie' in data) || (data.isWalkieTalkie is bool)) &&
+        (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 500000)) &&
+        (!('senderRole' in data) || (data.senderRole is string && data.senderRole.size() <= 100));
+    }
+
+    // Branch Validation
+    function isValidBranch(data) {
+      return data.keys().hasAll(['id', 'name', 'code', 'type', 'isActive']) &&
+        data.id is string && isValidId(data.id) &&
+        data.name is string && data.name.size() <= 150 &&
+        data.code is string && data.code.size() <= 50 &&
+        data.type in ['store', 'warehouse'] &&
+        data.isActive is bool;
+    }
+
+    // Transfers collection
+    match /transfers/{transferId} {
+      allow read: if true;
+      allow create: if isValidId(transferId) && isValidTransfer(incoming()) && incoming().id == transferId;
+      allow update: if isValidId(transferId) && isValidTransfer(incoming()) && incoming().id == transferId;
+      allow delete: if request.auth != null;
+    }
+
+    // Messages and instant Walkie-Talkie broadcasts
+    match /messages/{messageId} {
+      allow read: if true;
+      allow create: if isValidId(messageId) && isValidChatMessage(incoming()) && incoming().id == messageId;
+      allow update: if isValidId(messageId) && isValidChatMessage(incoming());
+      allow delete: if request.auth != null;
+    }
+
+    // Branches collection
+    match /branches/{branchId} {
+      allow read: if true;
+      allow create: if isValidId(branchId) && isValidBranch(incoming()) && incoming().id == branchId;
+      allow update: if isValidId(branchId) && isValidBranch(incoming()) && incoming().id == branchId;
+      allow delete: if request.auth != null;
+    }
+
+    // Catch-all deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
