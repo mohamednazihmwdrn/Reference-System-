@@ -133,7 +133,7 @@ export const BankReconciliationView: React.FC<BankReconciliationViewProps> = ({
   };
 
   return (
-    <div className="py-6 pb-36 sm:pb-44 px-4 sm:px-6 max-w-7xl mx-auto space-y-6">
+    <div className="py-4 pb-4 px-3 sm:px-6 max-w-7xl mx-auto space-y-5">
       
       {/* Header */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">

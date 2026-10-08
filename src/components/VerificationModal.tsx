@@ -23,7 +23,9 @@ import {
   Layers,
   Receipt,
   Smartphone,
-  SplitSquareVertical
+  SplitSquareVertical,
+  Printer,
+  Undo2
 } from 'lucide-react';
 import { TransferItem } from '../types';
 import { numberToArabicWords } from '../utils/numberToWordsArabic';
@@ -38,6 +40,8 @@ interface VerificationModalProps {
   onApprove: (transferId: string, notes?: string, confirmedAmount?: number, confirmedInvoice?: string) => void;
   onReject: (transferId: string, reason: string, notes?: string) => void;
   onNavigate: (transfer: TransferItem) => void;
+  onPrintVoucher?: (transfer: TransferItem) => void;
+  onReturnToReception?: (transferId: string) => void;
 }
 
 const COMMON_REJECTION_REASONS = [
@@ -57,6 +61,8 @@ export const VerificationModal: React.FC<VerificationModalProps> = ({
   onApprove,
   onReject,
   onNavigate,
+  onPrintVoucher,
+  onReturnToReception,
 }) => {
   // All hooks must be top-level unconditional
   const [activePhotoIndex, setActivePhotoIndex] = useState<number>(0);
@@ -537,47 +543,121 @@ export const VerificationModal: React.FC<VerificationModalProps> = ({
               </div>
             ) : null}
 
-            {/* Action Buttons */}
+            {/* Action Buttons based on Transfer Status */}
             <div className="mt-auto pt-2 border-t border-slate-100 space-y-2">
-              <button
-                type="button"
-                onClick={handleApproveClick}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all flex flex-col items-center justify-center gap-0.5 shadow-md shadow-emerald-600/20 cursor-pointer"
-              >
-                <div className="flex items-center gap-1.5 text-sm sm:text-base">
-                  <Check className="w-5 h-5" />
-                  <span>اعتماد الوصل وترحيله للأرشيف ✓</span>
-                </div>
-                <span className="text-[10px] text-emerald-100 font-normal">
-                  يتم إخلاء مكان هذا الوصل فوراً من الاستقبال لتنظيفه أولاً بأول
-                </span>
-              </button>
+              {transfer.status === 'verified' ? (
+                /* Verified Transfer Actions */
+                <div className="space-y-2">
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-emerald-900 text-xs">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <Check className="w-4 h-4 text-emerald-600" />
+                      <span>معاملة معتمدة ومرحلة للأرشيف ✓</span>
+                    </div>
+                    <div className="text-[11px] text-emerald-700 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                      <span>المعتمد: <b>{transfer.verifiedBy || 'المراجع المالي'}</b></span>
+                      {transfer.verifiedAt && (
+                        <span>التاريخ: {new Date(transfer.verifiedAt).toLocaleString('ar-EG')}</span>
+                      )}
+                    </div>
+                  </div>
 
-              {!showRejectForm && (
-                <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    {onPrintVoucher && (
+                      <button
+                        type="button"
+                        onClick={() => onPrintVoucher(transfer)}
+                        className="w-full bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                        title="طباعة سند تحويل رسمي منفرد"
+                      >
+                        <Printer className="w-4 h-4" />
+                        <span>طباعة السند</span>
+                      </button>
+                    )}
+
+                    {onReturnToReception && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm('هل تريد إلغاء الاعتماد وإعادة المعاملة إلى صندوق الاستقبال المباشر؟')) {
+                            onReturnToReception(transfer.id);
+                            onClose();
+                          }
+                        }}
+                        className="w-full bg-slate-100 hover:bg-amber-50 hover:text-amber-800 text-slate-700 font-bold py-2.5 px-3 rounded-xl text-xs border border-slate-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        title="إلغاء الاعتماد وإعادة الحركة للاستقبال"
+                      >
+                        <Undo2 className="w-4 h-4 text-amber-600" />
+                        <span>إعادة للاستقبال</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : transfer.status === 'rejected' ? (
+                /* Rejected Transfer Actions */
+                <div className="space-y-2">
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 text-red-900 text-xs">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <XCircle className="w-4 h-4 text-red-600" />
+                      <span>معاملة مرفوضة ✗</span>
+                    </div>
+                    <div className="text-[11px] text-red-700 mt-1">
+                      السبب: <b>{transfer.rejectionReason || 'غير محدد'}</b>
+                    </div>
+                  </div>
+
                   <button
                     type="button"
-                    onClick={() => setShowRejectForm(true)}
-                    className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-semibold py-2 px-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                    onClick={handleApproveClick}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
                   >
-                    <XCircle className="w-4 h-4" />
-                    <span>رفض التحويل</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onReject(transfer.id, 'صورة غير واضحة - يرجى إعادة التصوير', accountantNotes);
-                      soundManager.playReject();
-                      if (hasNext) handleNext();
-                      else onClose();
-                    }}
-                    className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-semibold py-2 px-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <HelpCircle className="w-4 h-4" />
-                    <span>طلب إعادة تصوير</span>
+                    <Check className="w-4 h-4" />
+                    <span>تغيير الحالة إلى معتمد وترحيل للأرشيف</span>
                   </button>
                 </div>
+              ) : (
+                /* Pending Transfer Actions */
+                <>
+                  <button
+                    type="button"
+                    onClick={handleApproveClick}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all flex flex-col items-center justify-center gap-0.5 shadow-md shadow-emerald-600/20 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-1.5 text-sm sm:text-base">
+                      <Check className="w-5 h-5" />
+                      <span>اعتماد الوصل وترحيله للأرشيف ✓</span>
+                    </div>
+                    <span className="text-[10px] text-emerald-100 font-normal">
+                      يتم إخلاء مكان هذا الوصل فوراً من الاستقبال لتنظيفه أولاً بأول
+                    </span>
+                  </button>
+
+                  {!showRejectForm && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowRejectForm(true)}
+                        className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-semibold py-2 px-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        <span>رفض التحويل</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onReject(transfer.id, 'صورة غير واضحة - يرجى إعادة التصوير', accountantNotes);
+                          soundManager.playReject();
+                          if (hasNext) handleNext();
+                          else onClose();
+                        }}
+                        className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-semibold py-2 px-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <HelpCircle className="w-4 h-4" />
+                        <span>طلب إعادة تصوير</span>
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

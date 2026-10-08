@@ -7,9 +7,9 @@
 
 export async function compressImage(
   fileOrDataUrl: File | string,
-  maxWidth = 1000,
-  maxHeight = 1000,
-  quality = 0.72
+  maxWidth = 960,
+  maxHeight = 960,
+  quality = 0.68
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     let objectUrl: string | null = null;
@@ -114,7 +114,7 @@ export async function compressMultipleImages(
   for (let i = 0; i < fileArray.length; i++) {
     const file = fileArray[i];
     try {
-      const compressed = await compressImage(file, 1000, 1000, 0.72);
+      const compressed = await compressImage(file, 960, 960, 0.68);
       results.push(compressed);
       if (onProgress) onProgress(i + 1, fileArray.length);
     } catch (err) {

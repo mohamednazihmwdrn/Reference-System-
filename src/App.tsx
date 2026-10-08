@@ -18,7 +18,7 @@ import { SingleTransferVoucherModal } from './components/SingleTransferVoucherMo
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { PWAUpdateToast } from './components/PWAUpdateToast';
 import { CompanyChatView } from './components/CompanyChatView';
-import { Radio, Bell, X, MessageSquare, CheckCircle2, Volume2 } from 'lucide-react';
+import { Bell, X, MessageSquare, CheckCircle2, Volume2, Mic } from 'lucide-react';
 
 import { TransferItem, Branch, BankAccount, UserSession } from './types';
 import {
@@ -115,16 +115,17 @@ export default function App() {
         window.history.pushState({ tab: nextTab }, '');
       } catch {}
       setActiveTab(nextTab);
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     }
   };
 
-  // Live real-time incoming alert banner (Transfers, Chat, Walkie-talkie)
+  // Live real-time incoming alert banner (Transfers, Chat, Voice notes)
   const [liveAlertBanner, setLiveAlertBanner] = useState<{
     id: string;
     text: string;
     senderName?: string;
     senderId?: string;
-    type: 'transfer' | 'walkie' | 'chat';
+    type: 'transfer' | 'voice' | 'chat';
     imageUrl?: string;
     audioUrl?: string;
     transfer?: TransferItem;
@@ -132,7 +133,6 @@ export default function App() {
 
   // Targeted channel for direct chat reply from incoming notification
   const [chatTargetChannel, setChatTargetChannel] = useState<string>('all');
-  const [chatAutoOpenWalkie, setChatAutoOpenWalkie] = useState<boolean>(false);
 
   // Request browser Notification permissions on launch
   useEffect(() => {
@@ -237,7 +237,7 @@ export default function App() {
         saveTransfers(serverTransfers);
       }
 
-      // 2. Handle specific SSE event payloads (Walkie-talkie & Chat)
+      // 2. Handle specific SSE & Firestore event payloads (Voice Notes & Chat)
       if (eventData?.type === 'NEW_MESSAGE' && eventData.message) {
         const msg = eventData.message;
         const currentUserId = currentSession?.role === 'auditor' ? 'auditor_main' : currentSession?.branchId;
@@ -247,44 +247,42 @@ export default function App() {
 
         if (msg.senderId !== currentUserId && isForMe) {
           if ('vibrate' in navigator) {
-            navigator.vibrate([200, 100, 200, 100, 300]);
+            navigator.vibrate([150, 80, 150]);
           }
 
-          if (msg.isWalkieTalkie) {
-            soundManager.playWalkieTalkieChirp();
-            // Automatically play walkie-talkie audio directly out of the phone speaker
-            if (msg.audioUrl) {
-              soundManager.playAudioData(msg.audioUrl);
-            }
+          soundManager.playMessageReceived();
+
+          if (msg.audioUrl) {
+            // Voice note received
             if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
               try {
-                new Notification(`🎙️ بث لاسلكي مباشر من: ${msg.senderName}`, {
-                  body: 'اضغط للاستماع والرد السريع',
+                new Notification(`🎙️ تسجيل صوتي جديد من: ${msg.senderName}`, {
+                  body: msg.audioDuration ? `المدة: ${msg.audioDuration} ثانية - اضغط للاستماع` : 'اضغط للاستماع والرد',
                   icon: '/pwa-192x192.png',
                 });
               } catch {}
             }
             setLiveAlertBanner({
               id: String(Date.now()),
-              text: `🎙️ بث لاسلكي مباشر وارد الآن من: ${msg.senderName}`,
+              text: `🎙️ تسجيل صوتي وارد من: ${msg.senderName} (${msg.audioDuration ? msg.audioDuration + ' ث' : ''})`,
               senderName: msg.senderName,
               senderId: msg.senderId,
-              audioUrl: msg.audioUrl || undefined,
-              type: 'walkie',
+              audioUrl: msg.audioUrl,
+              type: 'voice',
             });
           } else {
-            soundManager.playMessageReceived();
+            // Text or image message received
             if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
               try {
-                new Notification(`💬 رسالة جديدة من: ${msg.senderName}`, {
-                  body: msg.text || 'رسالة جديدة',
+                new Notification(`💬 رسالة من: ${msg.senderName}`, {
+                  body: msg.text || (msg.imageUrl ? '📷 صورة مرفقة' : 'رسالة جديدة'),
                   icon: '/pwa-192x192.png',
                 });
               } catch {}
             }
             setLiveAlertBanner({
               id: String(Date.now()),
-              text: `💬 رسالة جديدة من: ${msg.senderName}`,
+              text: msg.imageUrl ? `📷 صورة جديدة من: ${msg.senderName}` : `💬 ${msg.senderName}: ${msg.text || ''}`,
               senderName: msg.senderName,
               senderId: msg.senderId,
               type: 'chat',
@@ -532,17 +530,17 @@ export default function App() {
         onOpenPrivacyPolicy={openPrivacyModal}
       />
 
-      {/* Real-time Alert Banner for Incoming Transfers, Chats & Walkie-Talkie */}
+      {/* Real-time Alert Banner for Incoming Transfers, Chats & Voice Notes */}
       {liveAlertBanner && (
         <div className={`mx-3 sm:mx-auto max-w-2xl mt-2 p-3 sm:p-3.5 rounded-2xl flex items-center justify-between gap-3 text-xs sm:text-sm font-bold shadow-lg transition-all animate-in slide-in-from-top-3 duration-200 border z-30 ${
-          liveAlertBanner.type === 'walkie'
-            ? 'bg-amber-950 text-amber-200 border-amber-500 shadow-amber-950/40 ring-2 ring-amber-400'
+          liveAlertBanner.type === 'voice'
+            ? 'bg-emerald-950 text-emerald-200 border-emerald-500 shadow-emerald-950/40 ring-2 ring-emerald-400'
             : liveAlertBanner.type === 'transfer'
             ? 'bg-blue-950 text-white border-blue-500 shadow-blue-950/40'
-            : 'bg-emerald-950 text-white border-emerald-500 shadow-emerald-950/40'
+            : 'bg-slate-900 text-white border-slate-700 shadow-slate-950/40'
         }`}>
           <div className="flex items-center gap-2.5 min-w-0">
-            {liveAlertBanner.type === 'walkie' && <Radio className="w-5 h-5 text-amber-400 shrink-0 animate-bounce" />}
+            {liveAlertBanner.type === 'voice' && <Mic className="w-5 h-5 text-emerald-400 shrink-0 animate-bounce" />}
             {liveAlertBanner.type === 'transfer' && (
               liveAlertBanner.imageUrl ? (
                 <img 
@@ -584,34 +582,18 @@ export default function App() {
               </button>
             )}
 
-            {liveAlertBanner.type === 'walkie' && (
-              <>
-                {liveAlertBanner.audioUrl && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundManager.playAudioData(liveAlertBanner.audioUrl!);
-                    }}
-                    className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 text-xs rounded-xl font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1"
-                  >
-                    <Volume2 className="w-3.5 h-3.5" />
-                    <span>استمع 🔊</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setChatTargetChannel(liveAlertBanner.senderId || 'all');
-                    setChatAutoOpenWalkie(true);
-                    handleTabChange('chat');
-                    setLiveAlertBanner(null);
-                  }}
-                  className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs rounded-xl font-black transition-all cursor-pointer shadow-xs flex items-center gap-1"
-                >
-                  <Radio className="w-3.5 h-3.5" />
-                  <span>رد باللاسلكي ⚡</span>
-                </button>
-              </>
+            {liveAlertBanner.type === 'voice' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setChatTargetChannel(liveAlertBanner.senderId || 'all');
+                  handleTabChange('chat');
+                  setLiveAlertBanner(null);
+                }}
+                className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-slate-950 text-xs rounded-xl font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1"
+              >
+                <span>استماع والرد 🎧</span>
+              </button>
             )}
 
             {liveAlertBanner.type === 'chat' && (
@@ -619,13 +601,12 @@ export default function App() {
                 type="button"
                 onClick={() => {
                   setChatTargetChannel(liveAlertBanner.senderId || 'all');
-                  setChatAutoOpenWalkie(false);
                   handleTabChange('chat');
                   setLiveAlertBanner(null);
                 }}
                 className="px-2.5 py-1.5 bg-white/20 hover:bg-white/30 active:scale-95 text-white text-xs rounded-xl font-bold transition-all cursor-pointer"
               >
-                رد على الرسالة 💬
+                فتح المحادثة 💬
               </button>
             )}
 
@@ -640,8 +621,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Content Router with generous bottom clearance for navigation bar */}
-      <main className="flex-1 pb-36 sm:pb-44 overflow-x-hidden">
+      {/* Main Content Router with exact clearance for mobile navigation bar */}
+      <main className="flex-1 pb-20 sm:pb-24 overflow-x-hidden">
         {activeTab === 'cashier' && (
           <CashierUploadView
             branches={branches}
@@ -686,7 +667,6 @@ export default function App() {
             currentSession={currentSession}
             branches={branches}
             initialTargetChannel={chatTargetChannel}
-            autoOpenWalkieTalkie={chatAutoOpenWalkie}
             onOpenVerifyModal={(tId) => {
               const item = transfers.find((t) => t.id === tId);
               if (item) openInspectingTransfer(item);
@@ -743,11 +723,17 @@ export default function App() {
         userRole={currentSession.role}
       />
 
-      {/* Verification Lightbox Modal (with Multi-photo dual inspection) */}
+      {/* Verification Work Card Modal (Interactive inspection & work card) */}
       {inspectingTransfer && (
         <VerificationModal
           transfer={inspectingTransfer}
-          allPendingTransfers={pendingTransfers}
+          allPendingTransfers={
+            inspectingTransfer.status === 'pending'
+              ? pendingTransfers
+              : inspectingTransfer.status === 'verified'
+              ? transfers.filter((t) => t.status === 'verified')
+              : transfers
+          }
           isOpen={!!inspectingTransfer}
           onClose={() => setInspectingTransfer(null)}
           onApprove={(id, notes, confirmedAmount, confirmedInvoice) => 
@@ -755,6 +741,8 @@ export default function App() {
           }
           onReject={(id, reason, notes) => handleRejectTransfer(id, reason, notes)}
           onNavigate={(nextItem) => setInspectingTransfer(nextItem)}
+          onPrintVoucher={openVoucherModal}
+          onReturnToReception={handleReturnToReception}
         />
       )}
 

@@ -85,6 +85,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
 
   // Search & Sorting
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchGlobalScope, setSearchGlobalScope] = useState<boolean>(false);
   const [sortField, setSortField] = useState<'createdAt' | 'amount'>('createdAt');
   const [sortAsc, setSortAsc] = useState<boolean>(false);
 
@@ -142,38 +143,67 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
     return verifiedTodayTransfers.reduce((sum, t) => sum + t.amount, 0);
   }, [verifiedTodayTransfers]);
 
-  // Filtered & Sorted Transfers based on current viewMode
+  // Global search matches across all records for instant discovery
+  const searchResultsGlobal = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return { total: 0, pending: 0, verified: 0, rejected: 0, items: [] };
+    }
+    const q = searchQuery.toLowerCase().trim();
+    const items = transfers.filter((t) => {
+      const matchInvoice = t.invoiceNo?.toLowerCase().includes(q);
+      const matchBranch = t.branchName?.toLowerCase().includes(q);
+      const matchRef = t.referenceNo ? t.referenceNo.toLowerCase().includes(q) : false;
+      const matchSender = t.senderName ? t.senderName.toLowerCase().includes(q) : false;
+      const matchAmount = t.amount?.toString().includes(q);
+      return matchInvoice || matchBranch || matchRef || matchSender || matchAmount;
+    });
+
+    return {
+      total: items.length,
+      pending: items.filter((t) => t.status === 'pending').length,
+      verified: items.filter((t) => t.status === 'verified').length,
+      rejected: items.filter((t) => t.status === 'rejected').length,
+      items,
+    };
+  }, [transfers, searchQuery]);
+
+  // Filtered & Sorted Transfers based on current viewMode & search scope
   const filteredTransfers = useMemo(() => {
+    const isGlobalSearching = searchGlobalScope && searchQuery.trim().length > 0;
+
     return transfers
       .filter((t) => {
-        // Mode 1: Reception view -> strictly show pending items that need approval!
-        if (viewMode === 'reception') {
-          if (t.status !== 'pending') return false;
-        } 
-        // Mode 2: Archive view -> strictly show items that have been verified or rejected!
-        else if (viewMode === 'archive') {
-          if (t.status === 'pending') return false;
-          if (selectedArchiveStatus === 'verified' && t.status !== 'verified') return false;
-          if (selectedArchiveStatus === 'rejected' && t.status !== 'rejected') return false;
-        } 
-        // Mode 3: All view -> full history
-        else if (viewMode === 'all') {
-          if (selectedStatus !== 'all' && t.status !== selectedStatus) return false;
-        }
+        // If user enabled global search, search across all records without tab restrictions!
+        if (!isGlobalSearching) {
+          // Mode 1: Reception view -> strictly show pending items that need approval!
+          if (viewMode === 'reception') {
+            if (t.status !== 'pending') return false;
+          } 
+          // Mode 2: Archive view -> strictly show items that have been verified or rejected!
+          else if (viewMode === 'archive') {
+            if (t.status === 'pending') return false;
+            if (selectedArchiveStatus === 'verified' && t.status !== 'verified') return false;
+            if (selectedArchiveStatus === 'rejected' && t.status !== 'rejected') return false;
+          } 
+          // Mode 3: All view -> full history
+          else if (viewMode === 'all') {
+            if (selectedStatus !== 'all' && t.status !== selectedStatus) return false;
+          }
 
-        // Branch filter (Drill-down to specific store or warehouse)
-        if (selectedBranch !== 'all' && t.branchId !== selectedBranch) {
-          return false;
+          // Branch filter (Drill-down to specific store or warehouse)
+          if (selectedBranch !== 'all' && t.branchId !== selectedBranch) {
+            return false;
+          }
         }
 
         // Search query
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase().trim();
-          const matchInvoice = t.invoiceNo.toLowerCase().includes(q);
-          const matchBranch = t.branchName.toLowerCase().includes(q);
+          const matchInvoice = t.invoiceNo?.toLowerCase().includes(q);
+          const matchBranch = t.branchName?.toLowerCase().includes(q);
           const matchRef = t.referenceNo ? t.referenceNo.toLowerCase().includes(q) : false;
           const matchSender = t.senderName ? t.senderName.toLowerCase().includes(q) : false;
-          const matchAmount = t.amount.toString().includes(q);
+          const matchAmount = t.amount?.toString().includes(q);
           if (!matchInvoice && !matchBranch && !matchRef && !matchSender && !matchAmount) {
             return false;
           }
@@ -189,7 +219,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
         const timeB = new Date(b.createdAt).getTime();
         return sortAsc ? timeA - timeB : timeB - timeA;
       });
-  }, [transfers, viewMode, selectedArchiveStatus, selectedStatus, selectedBranch, searchQuery, sortField, sortAsc]);
+  }, [transfers, viewMode, selectedArchiveStatus, selectedStatus, selectedBranch, searchQuery, searchGlobalScope, sortField, sortAsc]);
 
   // Currently selected branch object (if any)
   const activeBranchObj = branches.find((b) => b.id === selectedBranch);
@@ -311,7 +341,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   };
 
   return (
-    <div className="space-y-4 pb-36 sm:pb-44 select-none animate-in fade-in duration-150">
+    <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 space-y-3.5 pb-6 select-none animate-in fade-in duration-150">
       
       {/* ========================================================================= */}
       {/* Toast Notification Banner (Real-time Feedback on Approval & Archiving) */}
@@ -397,547 +427,318 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
         </div>
 
         {/* ========================================================================= */}
-        {/* Real-Time Stats Summary Card (Request 8) */}
-        {/* Shows: 1. Number of pending transfers */}
-        {/*        2. Total amount verified today */}
-        {/*        3. Number of rejected transfers */}
+        {/* Compact Real-Time KPI Strip (High information density, Zero wasted space) */}
         {/* ========================================================================= */}
-        <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3.5 space-y-2.5">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-              </span>
-              <span className="text-xs font-black tracking-wide text-slate-200">
-                المؤشرات اللحظية والمطابقة المباشرة (Real-Time Summary)
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2.5 py-0.5 rounded-full border border-slate-700">
-                اليوم: {todayDateStr}
-              </span>
-              {onClearAllTransfers && transfers.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (confirm('هل أنت متأكد من تنظيف وتفريغ كافة الحركات والوصولات نهائياً لبدء العمل الفعلي على نظافة؟')) {
-                      onClearAllTransfers();
-                    }
-                  }}
-                  className="text-[10px] text-red-300 hover:text-white bg-red-950/60 hover:bg-red-900 border border-red-700/60 px-2 py-0.5 rounded-full font-bold cursor-pointer transition-colors"
-                  title="تصفير وتنظيف الحركات لبدء العمل الفعلي"
-                >
-                  تصفير السجلات 🧹
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-right">
-            {/* 1. Number of pending transfers */}
-            <div
-              onClick={() => setViewMode('reception')}
-              className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                viewMode === 'reception'
-                  ? 'bg-amber-950/60 border-amber-400 ring-1 ring-amber-400/40'
-                  : 'bg-slate-900/80 border-slate-800 hover:border-amber-500/50'
-              }`}
-            >
-              <div>
-                <div className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span>التحويلات المعلقة</span>
-                </div>
-                <div className="text-2xl font-black font-mono text-white mt-1">
-                  {pendingTransfers.length}
-                </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
-                  {pendingTransfers.length === 0 ? '✨ لا توجد معلقات (نظيف)' : 'بانتظار الاعتماد بالاستقبال'}
-                </div>
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center font-mono text-amber-400 font-bold text-sm">
-                {pendingTransfers.length}
-              </div>
-            </div>
-
-            {/* 2. Total amount verified today */}
-            <div
-              onClick={() => { setViewMode('archive'); setSelectedArchiveStatus('verified'); }}
-              className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                viewMode === 'archive' && selectedArchiveStatus === 'verified'
-                  ? 'bg-emerald-950/60 border-emerald-400 ring-1 ring-emerald-400/40'
-                  : 'bg-slate-900/80 border-slate-800 hover:border-emerald-500/50'
-              }`}
-            >
-              <div>
-                <div className="text-[11px] font-bold text-emerald-300 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>المبلغ المعتمد اليوم</span>
-                </div>
-                <div className="text-xl sm:text-2xl font-black font-mono text-emerald-300 mt-1">
-                  {verifiedTodayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  <span className="text-[10px] text-emerald-400 font-sans mr-1">ج.م</span>
-                </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
-                  {verifiedTodayTransfers.length} إيصال معتمد ومرحل اليوم
-                </div>
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                <TrendingUp className="w-4 h-4" />
-              </div>
-            </div>
-
-            {/* 3. Number of rejected transfers */}
-            <div
-              onClick={() => { setViewMode('archive'); setSelectedArchiveStatus('rejected'); }}
-              className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                viewMode === 'archive' && selectedArchiveStatus === 'rejected'
-                  ? 'bg-red-950/60 border-red-400 ring-1 ring-red-400/40'
-                  : 'bg-slate-900/80 border-slate-800 hover:border-red-500/50'
-              }`}
-            >
-              <div>
-                <div className="text-[11px] font-bold text-red-300 flex items-center gap-1.5">
-                  <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                  <span>التحويلات المرفوضة</span>
-                </div>
-                <div className="text-2xl font-black font-mono text-white mt-1">
-                  {rejectedTransfers.length}
-                </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
-                  {rejectedTransfers.length === 0 ? 'لا توجد تحويلات مرفوضة' : 'مرفوضة وتحتاج تعديل'}
-                </div>
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center font-mono text-red-400 font-bold text-sm">
-                {rejectedTransfers.length}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Financial Quick Counters */}
-        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800 text-center">
-          <div 
-            onClick={() => setViewMode('reception')}
-            className={`rounded-xl p-2.5 cursor-pointer transition-all ${
-              viewMode === 'reception' ? 'bg-amber-950/80 ring-2 ring-amber-400' : 'bg-slate-800/60 hover:bg-slate-800'
-            }`}
-          >
-            <div className="text-[11px] text-amber-400 font-bold flex items-center justify-center gap-1">
-              <Inbox className="w-3.5 h-3.5" />
-              <span>بانتظار الاعتماد (الاستقبال)</span>
-            </div>
-            <div className="text-lg font-bold font-mono text-white mt-0.5">
-              {pendingTransfers.length}
-            </div>
-            <div className="text-[10px] font-mono text-slate-400">
-              {pendingAmount.toLocaleString()} ج.م
-            </div>
-          </div>
-
-          <div 
-            onClick={() => setViewMode('archive')}
-            className={`rounded-xl p-2.5 cursor-pointer transition-all ${
-              viewMode === 'archive' ? 'bg-emerald-950/80 ring-2 ring-emerald-400' : 'bg-slate-800/60 hover:bg-slate-800'
-            }`}
-          >
-            <div className="text-[11px] text-emerald-400 font-bold flex items-center justify-center gap-1">
-              <Archive className="w-3.5 h-3.5" />
-              <span>المعتمد والمُرحّل للأرشيف</span>
-            </div>
-            <div className="text-lg font-bold font-mono text-white mt-0.5">
-              {verifiedTransfers.length}
-            </div>
-            <div className="text-[10px] font-mono text-emerald-300">
-              {verifiedAmount.toLocaleString()} ج.م
-            </div>
-          </div>
-
-          <div 
-            onClick={() => setViewMode('all')}
-            className={`rounded-xl p-2.5 cursor-pointer transition-all ${
-              viewMode === 'all' ? 'bg-blue-950/80 ring-2 ring-blue-400' : 'bg-slate-800/60 hover:bg-slate-800'
-            }`}
-          >
-            <div className="text-[11px] text-slate-300 font-bold flex items-center justify-center gap-1">
-              <Layers className="w-3.5 h-3.5 text-blue-400" />
-              <span>إجمالي السجلات</span>
-            </div>
-            <div className="text-lg font-bold font-mono text-white mt-0.5">
-              {transfers.length}
-            </div>
-            <div className="text-[10px] font-mono text-slate-400">
-              {totalAmount.toLocaleString()} ج.م
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* PRIMARY AUDITOR MODE SWITCHER (الاستقبال vs الأرشيف والتقارير) */}
-      {/* Requested explicitly: Reception clears immediately upon approval */}
-      {/* ========================================================================= */}
-      <div className="bg-white border-2 border-slate-200 rounded-3xl p-2 shadow-xs">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          
-          {/* 1. Reception Mode Button (ينظف أولاً بأول) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-slate-800">
+          {/* 1. Pending Transfers */}
           <button
             type="button"
-            onClick={() => setViewMode('reception')}
-            className={`p-3.5 rounded-2xl text-right transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
+            onClick={() => { setViewMode('reception'); setSelectedBranch('all'); }}
+            className={`p-2.5 rounded-xl border transition-all text-right flex items-center justify-between cursor-pointer ${
               viewMode === 'reception'
-                ? 'bg-gradient-to-l from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/20 ring-2 ring-amber-400'
-                : 'bg-slate-50 hover:bg-slate-100 text-slate-700'
+                ? 'bg-amber-950/70 border-amber-400 ring-1 ring-amber-400'
+                : 'bg-slate-950/60 border-slate-800 hover:border-amber-500/50'
             }`}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-black text-sm">
-                <Inbox className="w-4 h-4" />
-                <span>📥 صفحة الاستقبال المباشر</span>
+            <div>
+              <div className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>الاستقبال المعلق (الوارد)</span>
               </div>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold ${
-                viewMode === 'reception'
-                  ? 'bg-white text-amber-900'
-                  : pendingTransfers.length > 0
-                  ? 'bg-amber-100 text-amber-900 animate-pulse'
-                  : 'bg-slate-200 text-slate-600'
-              }`}>
-                {pendingTransfers.length} وارد معلق
-              </span>
+              <div className="text-lg font-black font-mono text-white mt-0.5">
+                {pendingTransfers.length} <span className="text-xs text-slate-400 font-sans font-normal">إيصال</span>
+                {pendingAmount > 0 && (
+                  <span className="text-[11px] text-amber-400 font-mono mr-2">
+                    ({pendingAmount.toLocaleString()} ج.م)
+                  </span>
+                )}
+              </div>
             </div>
-            <div className={`text-[11px] font-medium leading-relaxed ${viewMode === 'reception' ? 'text-amber-50' : 'text-slate-500'}`}>
-              تنظف أولاً بأول · يُرحّل كل وصل فوراً للأرشيف ويُخلى مكانه من هنا عند الاعتماد
-            </div>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold ${
+              pendingTransfers.length > 0 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-slate-800 text-slate-400'
+            }`}>
+              {pendingTransfers.length > 0 ? 'بانتظار الاعتماد' : 'نظيف ✨'}
+            </span>
           </button>
 
-          {/* 2. Archive & Reports Mode Button (المعتمد والمرحل) */}
+          {/* 2. Amount Verified Today */}
           <button
             type="button"
-            onClick={() => setViewMode('archive')}
-            className={`p-3.5 rounded-2xl text-right transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
-              viewMode === 'archive'
-                ? 'bg-gradient-to-l from-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500'
-                : 'bg-slate-50 hover:bg-slate-100 text-slate-700'
+            onClick={() => { setViewMode('archive'); setSelectedArchiveStatus('verified'); }}
+            className={`p-2.5 rounded-xl border transition-all text-right flex items-center justify-between cursor-pointer ${
+              viewMode === 'archive' && selectedArchiveStatus === 'verified'
+                ? 'bg-emerald-950/70 border-emerald-400 ring-1 ring-emerald-400'
+                : 'bg-slate-950/60 border-slate-800 hover:border-emerald-500/50'
             }`}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-black text-sm">
-                <Archive className="w-4 h-4" />
-                <span>🗄️ الأرشيف العام والتقارير</span>
+            <div>
+              <div className="text-[11px] font-bold text-emerald-300 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>المعتمد اليوم في الأرشيف</span>
               </div>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold ${
-                viewMode === 'archive'
-                  ? 'bg-white text-emerald-900'
-                  : 'bg-emerald-100 text-emerald-900'
-              }`}>
-                {archivedTransfers.length} وصل مؤرشف
-              </span>
+              <div className="text-lg font-black font-mono text-emerald-300 mt-0.5">
+                {verifiedTodayAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                <span className="text-[10px] text-emerald-400 font-sans mr-1">ج.م</span>
+              </div>
             </div>
-            <div className={`text-[11px] font-medium leading-relaxed ${viewMode === 'archive' ? 'text-emerald-50' : 'text-slate-500'}`}>
-              كافة الفواتير المعتمدة والمرحلة مع إمكانية طباعة الأرشيف كاملاً أو طباعة كل وصل
-            </div>
+            <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              {verifiedTodayTransfers.length} معتمد
+            </span>
           </button>
 
-          {/* 3. Master Full Log (السجل الشامل) */}
+          {/* 3. Rejected Transfers */}
           <button
             type="button"
-            onClick={() => setViewMode('all')}
-            className={`p-3.5 rounded-2xl text-right transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
-              viewMode === 'all'
-                ? 'bg-slate-800 text-white shadow-md shadow-slate-800/20 ring-2 ring-slate-700'
-                : 'bg-slate-50 hover:bg-slate-100 text-slate-700'
+            onClick={() => { setViewMode('archive'); setSelectedArchiveStatus('rejected'); }}
+            className={`p-2.5 rounded-xl border transition-all text-right flex items-center justify-between cursor-pointer ${
+              viewMode === 'archive' && selectedArchiveStatus === 'rejected'
+                ? 'bg-red-950/70 border-red-400 ring-1 ring-red-400'
+                : 'bg-slate-950/60 border-slate-800 hover:border-red-500/50'
             }`}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-black text-sm">
-                <Layers className="w-4 h-4" />
-                <span>📋 كشف الحركات الشامل</span>
+            <div>
+              <div className="text-[11px] font-bold text-red-300 flex items-center gap-1.5">
+                <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                <span>المرفوضات والملاحظات</span>
               </div>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold ${
-                viewMode === 'all' ? 'bg-white text-slate-900' : 'bg-slate-200 text-slate-700'
-              }`}>
-                {transfers.length} سجل
-              </span>
+              <div className="text-lg font-black font-mono text-white mt-0.5">
+                {rejectedTransfers.length} <span className="text-xs text-slate-400 font-sans font-normal">طلب</span>
+              </div>
             </div>
-            <div className={`text-[11px] font-medium leading-relaxed ${viewMode === 'all' ? 'text-slate-200' : 'text-slate-500'}`}>
-              عرض شامل لكافة الفواتير بجميع الحالات وتدقيق القيود التاريخية
-            </div>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold ${
+              rejectedTransfers.length > 0 ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-slate-800 text-slate-400'
+            }`}>
+              {rejectedTransfers.length > 0 ? 'يحتاج مراجعة' : 'لا يوجد'}
+            </span>
           </button>
-
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* Branch Drill-Down Selector Pills (الرئيسية + كل محل ومخزن على حدة) */}
+      {/* 🧭 Integrated Sleek Control Bar (Search + Mode Switcher + Branch Pills) */}
+      {/* Maximum space efficiency - Combines search, modes, and filters compactly */}
       {/* ========================================================================= */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-3.5 shadow-2xs space-y-2.5">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-            <Store className="w-4 h-4 text-blue-600" />
-            <span>تصفية بحسب المحل أو المخزن المرسل:</span>
+      <div className="bg-white border border-slate-200 rounded-2xl p-2.5 sm:p-3 shadow-2xs space-y-2">
+        
+        {/* Row 1: Quick Search Input + Primary Mode Switcher Tabs */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
+          
+          {/* Smart Search Bar */}
+          <div className="relative flex-1">
+            <div className="absolute right-3 top-2.5 text-blue-600 pointer-events-none">
+              <Search className="w-4 h-4" />
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="بحث برقم الفاتورة، أو اسم المعرض/الفرع، أو المبلغ، أو اسم المرسل..."
+              className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-blue-500 rounded-xl pr-9 pl-9 py-2 text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => { setSearchQuery(''); setSearchGlobalScope(false); }}
+                className="absolute left-2.5 top-2 text-slate-400 hover:text-slate-700 p-0.5 rounded-lg cursor-pointer"
+                title="مسح البحث"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
-          {selectedBranch !== 'all' && (
+
+          {/* Primary View Mode Tabs (استقبال / أرشيف / كل السجلات) */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setViewMode('reception')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'reception'
+                  ? 'bg-amber-500 text-white shadow-2xs'
+                  : 'text-slate-700 hover:text-slate-900'
+              }`}
+              title="صفحة الاستقبال المباشر (تنظف أولاً بأول)"
+            >
+              <Inbox className="w-3.5 h-3.5" />
+              <span>الاستقبال</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                viewMode === 'reception' ? 'bg-amber-600 text-white' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {pendingTransfers.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode('archive')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'archive'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-slate-700 hover:text-slate-900'
+              }`}
+              title="الأرشيف العام والمرحلات"
+            >
+              <Archive className="w-3.5 h-3.5" />
+              <span>الأرشيف</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                viewMode === 'archive' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {archivedTransfers.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode('all')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'all'
+                  ? 'bg-slate-800 text-white shadow-2xs'
+                  : 'text-slate-700 hover:text-slate-900'
+              }`}
+              title="السجل المالي الشامل"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>الكل</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                viewMode === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {transfers.length}
+              </span>
+            </button>
+          </div>
+
+        </div>
+
+        {/* Row 2: Branch Quick Filter Pills + Archive Sub-Tabs + Bulk Actions */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100 text-xs">
+          
+          {/* Branch Filter Pills */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar max-w-full">
+            <span className="text-[10px] font-bold text-slate-400 shrink-0 ml-1">الفرع:</span>
+            
             <button
               type="button"
               onClick={() => setSelectedBranch('all')}
-              className="text-xs text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 cursor-pointer"
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-colors cursor-pointer ${
+                selectedBranch === 'all'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
             >
-              <span>عرض كافة الفروع</span>
-              <ChevronLeft className="w-3.5 h-3.5" />
+              🌐 كافة الفروع ({branches.length})
             </button>
-          )}
-        </div>
 
-        {/* Scrollable / Wrap Branch Navigation Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
-          
-          {/* Master Stream Button (الرئيسية - كافة المحلات والمخازن) */}
-          <button
-            type="button"
-            onClick={() => setSelectedBranch('all')}
-            className={`px-3.5 py-2.5 rounded-2xl font-bold whitespace-nowrap transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
-              selectedBranch === 'all'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            <span>🌐 كافة الفروع والمخازن</span>
-            {viewMode === 'reception' && pendingTransfers.length > 0 && (
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
-                selectedBranch === 'all' ? 'bg-amber-400 text-slate-900 font-bold' : 'bg-amber-200 text-amber-900 font-bold'
-              }`}>
-                {pendingTransfers.length} معلق
-              </span>
+            {branches.map((b) => {
+              const isSelected = selectedBranch === b.id;
+              const bCount = transfers.filter((t) => t.branchId === b.id && (viewMode === 'reception' ? t.status === 'pending' : true)).length;
+
+              return (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => setSelectedBranch(b.id)}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-colors flex items-center gap-1 cursor-pointer ${
+                    isSelected
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <span>{b.type === 'store' ? '🏪' : '📦'}</span>
+                  <span>{b.name}</span>
+                  {bCount > 0 && (
+                    <span className={`text-[9px] font-mono px-1 rounded ${
+                      isSelected ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {bCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Sub-Filters: Archive sub-filters or Bulk select */}
+          <div className="flex items-center gap-2 shrink-0">
+            {viewMode === 'archive' && (
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[11px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setSelectedArchiveStatus('all_archived')}
+                  className={`px-2 py-0.5 rounded cursor-pointer ${
+                    selectedArchiveStatus === 'all_archived' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
+                  }`}
+                >
+                  الكل ({archivedTransfers.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedArchiveStatus('verified')}
+                  className={`px-2 py-0.5 rounded cursor-pointer ${
+                    selectedArchiveStatus === 'verified' ? 'bg-white text-emerald-800 shadow-2xs' : 'text-slate-600'
+                  }`}
+                >
+                  معتمد ✓ ({verifiedTransfers.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedArchiveStatus('rejected')}
+                  className={`px-2 py-0.5 rounded cursor-pointer ${
+                    selectedArchiveStatus === 'rejected' ? 'bg-white text-red-800 shadow-2xs' : 'text-slate-600'
+                  }`}
+                >
+                  مرفوض ✗ ({rejectedTransfers.length})
+                </button>
+              </div>
             )}
-          </button>
 
-          {/* Individual Stores & Warehouses */}
-          {branches.map((b) => {
-            const bPending = transfers.filter((t) => t.branchId === b.id && t.status === 'pending').length;
-            const bVerified = transfers.filter((t) => t.branchId === b.id && t.status === 'verified').length;
-            const isSelected = selectedBranch === b.id;
-            const isStore = b.type === 'store';
+            {/* Bulk select for reception */}
+            {viewMode === 'reception' && filteredTransfers.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleSelectAllPending}
+                  className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer bg-blue-50 px-2 py-1 rounded-lg"
+                >
+                  {selectedIds.length > 0 && selectedIds.length === filteredTransfers.length ? (
+                    <CheckSquare className="w-3.5 h-3.5 text-blue-600" />
+                  ) : (
+                    <Square className="w-3.5 h-3.5 text-slate-400" />
+                  )}
+                  <span>تحديد الكل ({filteredTransfers.length})</span>
+                </button>
 
-            return (
-              <button
-                key={b.id}
-                type="button"
-                onClick={() => setSelectedBranch(b.id)}
-                className={`px-3.5 py-2.5 rounded-2xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                  isSelected
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                }`}
-              >
-                <span>{isStore ? '🏪' : '📦'}</span>
-                <span>{b.name}</span>
-                {viewMode === 'reception' && bPending > 0 ? (
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
-                    isSelected ? 'bg-amber-400 text-slate-900 font-bold' : 'bg-amber-200 text-amber-900 font-bold'
-                  }`}>
-                    {bPending}
-                  </span>
-                ) : viewMode === 'archive' && bVerified > 0 ? (
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
-                    isSelected ? 'bg-emerald-400 text-slate-900 font-bold' : 'bg-emerald-100 text-emerald-900 font-bold'
-                  }`}>
-                    {bVerified}
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-
-        </div>
-
-        {/* Spotlight Banner when a specific branch is selected */}
-        {activeBranchObj && (
-          <div className="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in fade-in duration-200">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg shrink-0">
-                {activeBranchObj.type === 'store' ? '🏪' : '📦'}
+                {selectedIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleBulkApproveClick}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer shadow-xs active:scale-95 transition-all text-[11px]"
+                  >
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>اعتماد ({selectedIds.length})</span>
+                  </button>
+                )}
               </div>
-              <div>
-                <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                  <span>أنت الآن تراجع: {activeBranchObj.name}</span>
-                  <span className="text-[10px] font-mono bg-blue-200/80 text-blue-900 px-1.5 py-0.5 rounded">
-                    {activeBranchObj.code}
-                  </span>
-                </div>
-                <div className="text-slate-500 text-[11px] mt-0.5">
-                  النوع: {activeBranchObj.type === 'store' ? 'محل تجاري' : 'مخزن بضائع'} · مسؤول الفرع: {activeBranchObj.defaultCashier || 'كاشير الفرع'}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 bg-white px-3 py-1.5 rounded-xl border border-blue-100 text-right">
-              <div>
-                <span className="text-[10px] text-slate-400 block">المعتمد في الأرشيف:</span>
-                <span className="font-mono font-bold text-emerald-700 text-xs">
-                  {activeBranchVerifiedSum.toLocaleString()} ج.م
-                </span>
-              </div>
-              <div className="w-px h-6 bg-slate-200"></div>
-              <div>
-                <span className="text-[10px] text-slate-400 block">المعلق بالاستقبال:</span>
-                <span className="font-mono font-bold text-amber-700 text-xs">
-                  {activeBranchPendingTransfers.length} طلبات
-                </span>
-              </div>
-            </div>
+            )}
           </div>
-        )}
 
-      </div>
-
-      {/* ========================================================================= */}
-      {/* Search Bar & Mode-specific Sub-Filters */}
-      {/* ========================================================================= */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-4 shadow-2xs space-y-3">
-        
-        {/* Search input */}
-        <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="بحث برقم الفاتورة، المحل، المبلغ، أو اسم الراسل..."
-            className="w-full bg-slate-50 border border-slate-300 rounded-2xl pr-10 pl-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute left-3 top-3 text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
         </div>
 
-        {/* Contextual Sub-filters based on viewMode */}
-        {viewMode === 'reception' && (
-          <div className="flex items-center justify-between bg-amber-50/80 border border-amber-200/80 px-3.5 py-2.5 rounded-2xl text-xs text-amber-900">
-            <div className="flex items-center gap-2 font-bold">
-              <Clock className="w-4 h-4 text-amber-600" />
-              <span>صندوق الوارد المباشر (المعلق): يعرض الفواتير الجديدة بانتظار الاعتماد والترحيل للأرشيف</span>
-            </div>
-            <span className="font-mono font-black text-amber-800 bg-amber-200/80 px-2 py-0.5 rounded-full text-xs">
-              {filteredTransfers.length} إيصال
+        {/* Global Search Scope alert if user searched */}
+        {searchQuery.trim() && (
+          <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-xs">
+            <span className="text-[11px] font-bold text-slate-600">
+              نتائج البحث: {searchResultsGlobal.total} مطابقة 
+              ({searchResultsGlobal.pending} معلق · {searchResultsGlobal.verified} معتمد بالأرشيف)
             </span>
-          </div>
-        )}
-
-        {viewMode === 'archive' && (
-          <div className="flex items-center justify-between gap-1 bg-slate-100 p-1 rounded-2xl overflow-x-auto text-xs font-bold">
-            <button
-              onClick={() => setSelectedArchiveStatus('all_archived')}
-              className={`flex-1 py-2 px-2.5 rounded-xl transition-all whitespace-nowrap text-center cursor-pointer ${
-                selectedArchiveStatus === 'all_archived'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              كافة الأرشيف ({archivedTransfers.length})
-            </button>
-
-            <button
-              onClick={() => setSelectedArchiveStatus('verified')}
-              className={`flex-1 py-2 px-2.5 rounded-xl transition-all whitespace-nowrap text-center flex items-center justify-center gap-1 cursor-pointer ${
-                selectedArchiveStatus === 'verified'
-                  ? 'bg-white text-emerald-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <span>المعتمد في الأرشيف ✓</span>
-              <span className="font-mono text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded-full text-[10px]">
-                {verifiedTransfers.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setSelectedArchiveStatus('rejected')}
-              className={`flex-1 py-2 px-2.5 rounded-xl transition-all whitespace-nowrap text-center flex items-center justify-center gap-1 cursor-pointer ${
-                selectedArchiveStatus === 'rejected'
-                  ? 'bg-white text-red-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <span>المرفوض ✗</span>
-              <span className="font-mono text-red-700 bg-red-100 px-1.5 py-0.2 rounded-full text-[10px]">
-                {rejectedTransfers.length}
-              </span>
-            </button>
-          </div>
-        )}
-
-        {viewMode === 'all' && (
-          <div className="flex items-center justify-between gap-1 bg-slate-100 p-1 rounded-2xl overflow-x-auto text-xs font-bold">
-            <button
-              onClick={() => setSelectedStatus('all')}
-              className={`flex-1 py-2 px-2.5 rounded-xl transition-all whitespace-nowrap text-center cursor-pointer ${
-                selectedStatus === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              الكل ({transfers.length})
-            </button>
-
-            <button
-              onClick={() => setSelectedStatus('pending')}
-              className={`flex-1 py-2 px-2.5 rounded-xl transition-all whitespace-nowrap text-center cursor-pointer ${
-                selectedStatus === 'pending' ? 'bg-white text-amber-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              المعلق ({pendingTransfers.length})
-            </button>
-
-            <button
-              onClick={() => setSelectedStatus('verified')}
-              className={`flex-1 py-2 px-2.5 rounded-xl transition-all whitespace-nowrap text-center cursor-pointer ${
-                selectedStatus === 'verified' ? 'bg-white text-emerald-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              المعتمد ({verifiedTransfers.length})
-            </button>
-
-            <button
-              onClick={() => setSelectedStatus('rejected')}
-              className={`flex-1 py-2 px-2.5 rounded-xl transition-all whitespace-nowrap text-center cursor-pointer ${
-                selectedStatus === 'rejected' ? 'bg-white text-red-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              المرفوض ({rejectedTransfers.length})
-            </button>
-          </div>
-        )}
-
-        {/* Bulk select tool for pending items in reception */}
-        {viewMode === 'reception' && filteredTransfers.length > 0 && (
-          <div className="flex items-center justify-between pt-1 text-xs text-slate-600 border-t border-slate-100">
             <button
               type="button"
-              onClick={handleSelectAllPending}
-              className="flex items-center gap-1.5 text-blue-700 hover:text-blue-900 font-bold cursor-pointer"
+              onClick={() => setSearchGlobalScope(!searchGlobalScope)}
+              className={`px-2 py-0.5 rounded-lg text-[11px] font-bold cursor-pointer ${
+                searchGlobalScope ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+              }`}
             >
-              {selectedIds.length > 0 && selectedIds.length === filteredTransfers.length ? (
-                <CheckSquare className="w-4 h-4 text-blue-600" />
-              ) : (
-                <Square className="w-4 h-4 text-slate-400" />
-              )}
-              <span>تحديد كافة المعلقات للاعتماد والترحيل الجماعي</span>
+              {searchGlobalScope ? '✓ بحث شامل بكافة الأقسام' : 'بحث بالتبويب الحالي فقط'}
             </button>
-
-            {selectedIds.length > 0 && (
-              <button
-                type="button"
-                onClick={handleBulkApproveClick}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 transition-all"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>اعتماد وترحيل {selectedIds.length} فواتير معاً للأرشيف</span>
-              </button>
-            )}
           </div>
         )}
 
@@ -950,7 +751,38 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
         
         {/* Empty State Handler */}
         {filteredTransfers.length === 0 ? (
-          viewMode === 'reception' ? (
+          searchQuery.trim() ? (
+            /* Search Not Found State */
+            <div className="bg-white border-2 border-slate-200 rounded-3xl p-8 sm:p-10 text-center space-y-3 shadow-2xs">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+                <Search className="w-7 h-7" />
+              </div>
+              <div className="font-bold text-slate-800 text-base">
+                لم يتم العثور على أي إيصال يطابق: &quot;{searchQuery}&quot;
+              </div>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                تأكد من كتابة رقم الفاتورة بشكل صحيح أو اسم المعرض/المخزن، أو جرب تفعيل البحث الشامل.
+              </p>
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(''); setSearchGlobalScope(false); }}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  مسح البحث وعرض كافة الفواتير
+                </button>
+                {searchResultsGlobal.total > 0 && !searchGlobalScope && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchGlobalScope(true)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  >
+                    عرض {searchResultsGlobal.total} نتائج في كافة الأقسام (شامل الأرشيف) 🔍
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : viewMode === 'reception' ? (
             /* Clean Reception Inbox Empty State (Requested by user: cleans up item by item) */
             <div className="bg-gradient-to-b from-white to-emerald-50/40 border-2 border-emerald-200 rounded-3xl p-8 sm:p-12 text-center space-y-4 shadow-sm animate-in fade-in duration-300">
               <div className="w-16 h-16 mx-auto rounded-3xl bg-emerald-100 text-emerald-700 flex items-center justify-center shadow-inner">
@@ -998,300 +830,199 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
             </div>
           )
         ) : (
-          /* Render Cards Vertically */
+          /* Render Movements as Compact Cells / Rows ("نظام خانة" لاستغلال أقصى مساحة ممكنة) */
           filteredTransfers.map((item) => {
             const isPending = item.status === 'pending';
             const isVerified = item.status === 'verified';
             const isRejected = item.status === 'rejected';
             const photos = item.images && item.images.length > 0 ? item.images : [item.screenshotUrl];
+            const primaryThumb = photos[0];
             const isSelected = selectedIds.includes(item.id);
 
             return (
               <div
                 key={item.id}
-                className={`bg-white rounded-3xl border transition-all shadow-xs overflow-hidden ${
+                onClick={() => onOpenVerifyModal(item)}
+                className={`group bg-white rounded-2xl border transition-all duration-150 shadow-2xs hover:shadow-sm cursor-pointer p-2.5 sm:p-3 flex items-center justify-between gap-2.5 select-none active:scale-[0.99] ${
                   isPending
-                    ? 'border-amber-300 ring-2 ring-amber-100/60'
+                    ? 'border-amber-200/90 hover:border-amber-400 bg-amber-50/15'
                     : isVerified
-                    ? 'border-emerald-200 hover:border-emerald-300'
-                    : 'border-red-200'
-                }`}
+                    ? 'border-slate-200 hover:border-emerald-300'
+                    : 'border-red-200 bg-red-50/15'
+                } ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/30' : ''}`}
+                title="اضغط لفتح بطاقة المعاملة وتدقيق الصور والاعتماد"
               >
-                {/* Card Top Header: Branch Badge + Time + Status */}
-                <div className="p-4 pb-3 border-b border-slate-100 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    {/* Checkbox for bulk actions (only for pending) */}
-                    {isPending && (
+                {/* Right side: Checkbox + Photo Thumbnail + Transaction Info */}
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  {/* Bulk Select Checkbox (only for pending in reception) */}
+                  {isPending && (
+                    <div 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleSelect(item.id);
+                      }}
+                      className="p-1 -m-1 text-slate-400 hover:text-blue-600 shrink-0 cursor-pointer"
+                    >
                       <input
                         type="checkbox"
                         checked={isSelected}
-                        onChange={() => handleToggleSelect(item.id)}
-                        className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-                        title="تحديد للاعتماد والترحيل الجماعي"
+                        onChange={() => {}}
+                        className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer pointer-events-none"
                       />
-                    )}
-
-                    {/* Sender Branch Badge */}
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-xl text-xs font-bold text-slate-800 border border-slate-200">
-                      <span>{item.branchName.includes('مخزن') ? '📦' : '🏪'}</span>
-                      <span>{item.branchName}</span>
                     </div>
+                  )}
 
-                    <span className="text-[11px] font-mono text-slate-400">
-                      {new Date(item.createdAt).toLocaleTimeString('ar-EG', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </div>
-
-                  {/* Status Indicator Badge */}
-                  <div>
-                    {isPending && (
-                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300 animate-pulse">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>بانتظار الاعتماد والترحيل</span>
-                      </span>
-                    )}
-
-                    {isVerified && (
-                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>معتمد ومُرحّل للأرشيف ✓</span>
-                      </span>
-                    )}
-
-                    {isRejected && (
-                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-800 border border-red-300">
-                        <XCircle className="w-3.5 h-3.5 text-red-600" />
-                        <span>مرفوض ومؤرشف ✗</span>
+                  {/* Compact Thumbnail with photo count indicator */}
+                  <div 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLightboxImage({
+                        url: primaryThumb,
+                        title: `${item.invoiceNo} - ${item.branchName}`
+                      });
+                    }}
+                    className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-900 border border-slate-200 shrink-0 group/thumb shadow-2xs"
+                    title="انقر لتكبير صورة الإيصال"
+                  >
+                    <img 
+                      src={primaryThumb} 
+                      alt="وصل" 
+                      className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform" 
+                    />
+                    {photos.length > 1 && (
+                      <span className="absolute bottom-0 right-0 left-0 bg-black/75 text-[9px] font-mono text-white text-center py-0.2 font-bold backdrop-blur-2xs">
+                        {photos.length} 📷
                       </span>
                     )}
                   </div>
-                </div>
 
-                {/* Card Main Body */}
-                <div className="p-4 space-y-3.5">
-                  
-                  {/* Row: Invoice Code & Amount in EGP */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] text-slate-400 font-semibold block">كود الطلب / الفاتورة:</span>
-                      <span className="text-base font-mono font-black text-slate-900">{item.invoiceNo}</span>
+                  {/* Core Movement Info ("نظام خانة" مدمج ومنظم) */}
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    {/* Line 1: Sender Name + Branch + Invoice */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-xs sm:text-sm text-slate-900 truncate max-w-[130px] sm:max-w-[180px] flex items-center gap-1">
+                        <span className="text-blue-600">👤</span>
+                        <span className="truncate">{item.senderName || item.cashierName || 'الفرع'}</span>
+                      </span>
+
+                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded-md flex items-center gap-1 truncate max-w-[110px] sm:max-w-[160px]">
+                        <span>{item.branchName.includes('مخزن') ? '📦' : '🏪'}</span>
+                        <span className="truncate">{item.branchName}</span>
+                      </span>
+
+                      <span className="font-mono font-black text-[11px] sm:text-xs text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+                        #{item.invoiceNo}
+                      </span>
                     </div>
 
-                    <div className="text-left">
-                      <span className="text-[10px] text-slate-400 font-semibold block">المبلغ المعتمد:</span>
-                      {item.amount > 0 ? (
-                        <div className="text-xl font-mono font-black text-emerald-700">
-                          {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                          <span className="text-xs font-sans font-bold text-slate-500 mr-1">ج.م</span>
-                        </div>
-                      ) : (
-                        <div className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
-                          المبلغ داخل الصور المرفقة
-                        </div>
+                    {/* Line 2: Date & Time + Status / Rejection note */}
+                    <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-slate-500 font-medium">
+                      <span className="font-mono text-slate-500 whitespace-nowrap flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-slate-400" />
+                        <span>
+                          {new Date(item.createdAt).toLocaleDateString('ar-EG', { month: 'numeric', day: 'numeric' })}
+                        </span>
+                        <span>·</span>
+                        <Clock className="w-2.5 h-2.5 text-slate-400" />
+                        <span>
+                          {new Date(item.createdAt).toLocaleTimeString('ar-EG', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </span>
+
+                      {item.referenceNo && (
+                        <span className="text-[10px] font-mono text-slate-400 hidden lg:inline truncate max-w-[100px]">
+                          مرجع: {item.referenceNo}
+                        </span>
+                      )}
+
+                      {isRejected && item.rejectionReason && (
+                        <span className="text-red-600 font-bold truncate max-w-[140px] bg-red-50 px-1 rounded text-[10px]">
+                          {item.rejectionReason}
+                        </span>
                       )}
                     </div>
                   </div>
+                </div>
 
-                  {/* Dual Photo Gallery: Click to Zoom High Resolution */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
-                      <span>الصور المرفقة بالعملية ({photos.length} صور) - انقر على أي صورة لتكبيرها:</span>
-                      <span className="text-blue-600 flex items-center gap-1">
-                        <ZoomIn className="w-3.5 h-3.5" />
-                        <span>تكبير كامل بملء الشاشة</span>
+                {/* Left side: Amount + Status Badge + Quick Approve */}
+                <div className="flex items-center gap-2 shrink-0 text-left">
+                  {/* Amount */}
+                  <div className="text-left">
+                    {item.amount > 0 ? (
+                      <div className="font-mono font-black text-xs sm:text-sm text-emerald-700">
+                        {item.amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                        <span className="text-[10px] font-sans text-slate-400 mr-0.5">ج.م</span>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                        راجع الصور
                       </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {photos.map((imgSrc, idx) => (
-                        <div
-                          key={idx}
-                          onClick={() => setLightboxImage({
-                            url: imgSrc,
-                            title: `${item.invoiceNo} - ${idx === 0 ? 'صورة الفاتورة' : 'صورة إيصال إنستاباي'} (${item.branchName})`
-                          })}
-                          className="relative group rounded-2xl overflow-hidden border-2 border-slate-200 hover:border-blue-500 bg-black aspect-[4/5] shadow-xs cursor-pointer transition-all"
-                        >
-                          <img
-                            src={imgSrc}
-                            alt="receipt"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                          />
-
-                          {/* Hover/Tap Zoom badge */}
-                          <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                            <div className="bg-white/95 text-slate-900 rounded-full px-3 py-1.5 shadow-lg flex items-center gap-1 text-xs font-bold">
-                              <ZoomIn className="w-3.5 h-3.5 text-blue-600" />
-                              <span>تكبير</span>
-                            </div>
-                          </div>
-
-                          <div className="absolute top-1.5 right-1.5 bg-black/75 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg backdrop-blur-xs">
-                            {idx === 0 ? 'الفاتورة' : 'إيصال إنستاباي'}
-                          </div>
-
-                          <div className="absolute bottom-1 right-1 left-1 bg-black/70 text-white text-[10px] text-center py-0.5 rounded-lg backdrop-blur-xs truncate">
-                            🔍 اضغط للتكبير
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    )}
                   </div>
 
-                  {/* Transfer Details Grid */}
-                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 text-xs space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-500">الرقم المرجعي (Ref):</span>
-                      <span className="font-mono font-bold text-slate-800">
-                        {item.referenceNo || 'بدون رقم مرجعي'}
+                  {/* Status Badge */}
+                  <div className="hidden xs:block">
+                    {isPending && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full whitespace-nowrap">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>
+                        <span>معلق</span>
                       </span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-500">اسم الراسل / العميل:</span>
-                      <span className="font-semibold text-slate-800">
-                        {item.senderName || 'غير مسجل (في الإيصال)'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-500">مسؤول الإرسال (الكاشير):</span>
-                      <span className="font-semibold text-slate-700">
-                        {item.cashierName || 'كاشير الفرع'}
-                      </span>
-                    </div>
-
-                    {item.cashierNote && (
-                      <div className="pt-1 border-t border-slate-200 text-slate-700">
-                        <span className="font-bold text-slate-500">ملاحظة الكاشير: </span>
-                        <span>{item.cashierNote}</span>
-                      </div>
                     )}
-
                     {isVerified && (
-                      <div className="pt-1 border-t border-emerald-200 text-emerald-800 flex flex-wrap items-center justify-between gap-1 font-semibold">
-                        <span>المحاسب المعتمد: {item.verifiedBy || 'المراجع المالي'}</span>
-                        <span className="text-emerald-700 text-[11px] font-mono">
-                          مُرحّل للأرشيف بتاريخ: {item.verifiedAt ? new Date(item.verifiedAt).toLocaleDateString('ar-EG') : 'اليوم'}
-                        </span>
-                      </div>
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-full whitespace-nowrap">
+                        <span>✓ معتمد</span>
+                      </span>
                     )}
-
-                    {isRejected && item.rejectionReason && (
-                      <div className="pt-1.5 border-t border-red-200 text-red-700">
-                        <span className="font-bold">سبب الرفض المسجل: </span>
-                        <span>{item.rejectionReason}</span>
-                      </div>
+                    {isRejected && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-bold bg-red-100 text-red-900 border border-red-300 px-2 py-0.5 rounded-full whitespace-nowrap">
+                        <span>✗ مرفوض</span>
+                      </span>
                     )}
                   </div>
 
-                </div>
-
-                {/* Card Action Buttons */}
-                <div className="p-3.5 bg-slate-50/80 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                  
+                  {/* Actions: Quick 1-tap Approve or Open Card */}
                   {isPending ? (
-                    <>
-                      {/* Action 1: Instant 1-tap Approve & Archive (Clears reception immediately) */}
+                    <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => handleQuickApproveWithFeedback(item)}
-                        className="flex-1 min-w-[140px] h-11 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-98 transition-all cursor-pointer"
-                        title="اعتماد الوصل فوراً وترحيله للأرشيف وإخلاء مكانه من الاستقبال"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleQuickApproveWithFeedback(item);
+                        }}
+                        className="px-2 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer"
+                        title="اعتماد فوري وترحيل للأرشيف بنقرة واحدة"
                       >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>اعتماد وترحيل للأرشيف ✓</span>
+                        <Check className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">اعتماد</span>
                       </button>
-
-                      {/* Action 2: Deep Inspection Modal */}
-                      <button
-                        type="button"
-                        onClick={() => onOpenVerifyModal(item)}
-                        className="min-w-[110px] h-11 px-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/20 active:scale-98 transition-all cursor-pointer"
-                      >
-                        <ShieldCheck className="w-4 h-4" />
-                        <span>تدقيق وتعديل</span>
-                      </button>
-
-                      {/* Action 3: Reject button */}
-                      <button
-                        type="button"
-                        onClick={() => setRejectingItem(item)}
-                        className="h-11 px-3.5 rounded-2xl bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 font-bold text-xs flex items-center justify-center gap-1 active:scale-98 transition-all cursor-pointer"
-                        title="رفض الإيصال وترحيله للمرفوضات"
-                      >
-                        <XCircle className="w-4 h-4" />
-                        <span>رفض</span>
-                      </button>
-
-                      {/* Action 4: Print Voucher */}
-                      <button
-                        type="button"
-                        onClick={() => onPrintSingleVoucher(item)}
-                        className="h-11 px-3.5 rounded-2xl bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 active:scale-98 transition-all cursor-pointer"
-                        title="طباعة سند حركة فردي"
-                      >
-                        <Printer className="w-4 h-4" />
-                        <span>سند</span>
-                      </button>
-                    </>
+                      <div className="p-1 text-slate-400 hover:text-blue-600 rounded-lg group-hover:text-blue-600 transition-colors">
+                        <ChevronLeft className="w-4 h-4" />
+                      </div>
+                    </div>
                   ) : (
-                    /* Archived Item Controls */
-                    <>
-                      <div className="flex items-center gap-2">
-                        {isVerified && (
-                          <div className="text-xs text-emerald-800 font-bold flex items-center gap-1.5">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <span>معاملة مؤرشفة ومعتمدة رسمياً</span>
-                          </div>
-                        )}
-                        {isRejected && (
-                          <div className="text-xs text-red-800 font-bold flex items-center gap-1.5">
-                            <XCircle className="w-4 h-4 text-red-600" />
-                            <span>إيصال مرفوض في الأرشيف</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2 mr-auto">
-                        {/* Option to un-archive back to reception if needed */}
-                        {onReturnToReception && (
-                          <button
-                            type="button"
-                            onClick={() => handleReturnToReceptionClick(item)}
-                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
-                            title="إلغاء الترحيل وإعادة هذا الوصل إلى صندوق الاستقبال"
-                          >
-                            <Undo2 className="w-3.5 h-3.5" />
-                            <span>إعادة للاستقبال</span>
-                          </button>
-                        )}
-
+                    <div className="flex items-center gap-1">
+                      {onReturnToReception && isVerified && (
                         <button
                           type="button"
-                          onClick={() => onOpenVerifyModal(item)}
-                          className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReturnToReceptionClick(item);
+                          }}
+                          className="p-1 text-slate-400 hover:text-amber-600 rounded-lg transition-colors cursor-pointer"
+                          title="إعادة المعاملة للاستقبال"
                         >
-                          عرض التدقيق
+                          <Undo2 className="w-3.5 h-3.5" />
                         </button>
-
-                        <button
-                          type="button"
-                          onClick={() => onPrintSingleVoucher(item)}
-                          className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                          <span>طباعة السند</span>
-                        </button>
+                      )}
+                      <div className="p-1 text-slate-400 hover:text-blue-600 rounded-lg group-hover:text-blue-600 transition-colors">
+                        <ChevronLeft className="w-4 h-4" />
                       </div>
-                    </>
+                    </div>
                   )}
-
                 </div>
-
               </div>
             );
           })

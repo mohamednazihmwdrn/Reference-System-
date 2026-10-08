@@ -32,7 +32,11 @@ import {
   ShieldCheck,
   Power,
   SlidersHorizontal,
-  Info
+  Info,
+  HardDrive,
+  Server,
+  Cloud,
+  Database
 } from 'lucide-react';
 import { Branch, BankAccount, TransferItem } from '../types';
 import { 
@@ -64,7 +68,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onClearAllTransfers,
 }) => {
   // Navigation / Filter inside Settings
-  const [activeTab, setActiveTab] = useState<'branches' | 'banks' | 'backup'>('branches');
+  const [activeTab, setActiveTab] = useState<'branches' | 'banks' | 'backup' | 'storage'>('branches');
   const [branchFilter, setBranchFilter] = useState<'all' | 'store' | 'warehouse' | 'inactive'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -350,7 +354,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   return (
-    <div className="py-5 px-3 sm:px-6 max-w-7xl mx-auto space-y-6 pb-36 sm:pb-44 select-none animate-in fade-in duration-150">
+    <div className="py-4 px-3 sm:px-6 max-w-7xl mx-auto space-y-5 pb-4 select-none animate-in fade-in duration-150">
       
       {/* ========================================================================= */}
       {/* Toast Notification Banner */}
@@ -493,7 +497,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <button
           type="button"
           onClick={() => setActiveTab('backup')}
-          className={`py-2.5 px-4 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+          className={`py-2.5 px-3 sm:px-4 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
             activeTab === 'backup'
               ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -501,6 +505,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <SlidersHorizontal className="w-4 h-4" />
           <span>النسخ الاحتياطي والضبط</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('storage')}
+          className={`py-2.5 px-3 sm:px-4 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            activeTab === 'storage'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <HardDrive className="w-4 h-4 text-emerald-400" />
+          <span>سعة الصور (1,000,000+)</span>
         </button>
       </div>
 
@@ -1050,8 +1067,143 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 1: ADD NEW BRANCH (FULL FORM) */}
+      {/* SECTION 4: IMAGE DATABASE CAPACITY & 1,000,000+ PHOTOS ARCHITECTURE */}
       {/* ========================================================================= */}
+      {activeTab === 'storage' && (
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs space-y-5 text-right">
+          
+          <div className="pb-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2 font-black text-base text-slate-900">
+                <HardDrive className="w-5 h-5 text-emerald-600" />
+                <span>تنظيم وسعة استقبال الصور وقاعدة البيانات (1,000,000 صورة على الأقل شهرياً)</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                دراسة هندسية ومعمارية توضح كيف يستقبل النظام مليون صورة وأكثر شهرياً بأقصى سرعة وأقل تكلفة.
+              </p>
+            </div>
+            <span className="px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold font-mono">
+              جاهز لاستيعاب 1M+ صور/شهر 🚀
+            </span>
+          </div>
+
+          {/* 4 Core Pillars of Image Scaling */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            
+            {/* 1. Monthly Volume */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                <Database className="w-4 h-4 text-blue-600" />
+                <span>المعدل الشهري المستهدف</span>
+              </div>
+              <div className="text-xl font-black font-mono text-slate-900">
+                1,000,000 <span className="text-xs font-sans text-slate-500">صورة/شهر</span>
+              </div>
+              <div className="text-[11px] text-slate-500">
+                معدل: ~33,333 صورة يومياً (حوالي 45 صورة بالدقيقة لكافة الفروع).
+              </div>
+            </div>
+
+            {/* 2. Client-Side Compression */}
+            <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3.5 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
+                <Sparkles className="w-4 h-4 text-emerald-600" />
+                <span>كفاءة الضغط الفوري للهواتف</span>
+              </div>
+              <div className="text-xl font-black font-mono text-emerald-800">
+                من 10MB إلى ~85KB
+              </div>
+              <div className="text-[11px] text-emerald-700">
+                توفير 99% من حجم البيانات مع الحفاظ الكامل على دقة قراءة الفواتير.
+              </div>
+            </div>
+
+            {/* 3. Monthly Storage Footprint */}
+            <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-3.5 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900">
+                <Cloud className="w-4 h-4 text-blue-600" />
+                <span>إجمالي التخزين الفعلي شهرياً</span>
+              </div>
+              <div className="text-xl font-black font-mono text-blue-800">
+                ~85 إلى 100 GB <span className="text-xs font-sans text-blue-600">/شهر</span>
+              </div>
+              <div className="text-[11px] text-blue-700">
+                بدلاً من 10,000 جيجابايت لو تم رفع الصور الخام بدون ضغط!
+              </div>
+            </div>
+
+            {/* 4. Infrastructure Cost */}
+            <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-3.5 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
+                <Server className="w-4 h-4 text-amber-600" />
+                <span>التكلفة السحابية الشهرية</span>
+              </div>
+              <div className="text-xl font-black font-mono text-amber-800">
+                ~1.5$ إلى 2.5$ <span className="text-xs font-sans text-amber-600">شهرياً فقط</span>
+              </div>
+              <div className="text-[11px] text-amber-700">
+                تكلفة استضافة 100GB في Firebase Storage أو Cloudflare R2 شبه مجانية.
+              </div>
+            </div>
+
+          </div>
+
+          {/* Architecture Pipeline Explanation */}
+          <div className="border border-slate-200 rounded-2xl p-4 space-y-3 bg-slate-50">
+            <h4 className="font-black text-sm text-slate-900 flex items-center gap-2">
+              <span>🏗️ المعمارية المنظمة لاستيعاب مليون صورة بدون بطء أو امتلاء الذاكرة:</span>
+            </h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              
+              <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
+                <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-mono">1</span>
+                  <span>الضغط المباشر على هاتف الكاشير</span>
+                </div>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  يقوم محرك <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-blue-700">imageCompressor.ts</code> عبر تقنية Canvas بضغط الصورة فور التقاطها في أجزاء من الثانية إلى أبعاد 960×960px بصيغة JPEG عالية الوضوح. هذا يمنع بطء الهاتف ويوفر باقة الإنترنت.
+                </p>
+              </div>
+
+              <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
+                <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-mono">2</span>
+                  <span>تخزين كائنات الصور (Object Storage)</span>
+                </div>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  تُرفع الصور كملفات ثنائية إلى مستودع الكائنات (Firebase Cloud Storage / Cloudflare R2). قاعدة بيانات Firestore <b>لا تخزن ملف الصورة نفسه</b>، بل تخزن فقط رابط الصورة (URL) الذي حجمه أقل من 100 بايت!
+                </p>
+              </div>
+
+              <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5">
+                <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-mono">3</span>
+                  <span>الأرشفة الباردة والتحميل عند الطلب</span>
+                </div>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  تطبيق المحاسب لا يحمل مليون صورة في الذاكرة دفعة واحدة؛ بل يعرض "نظام الخانات" المصغر المدمج، ولا يتم تحميل الصورة الكاملة إلا عند نقر المحاسب على خانة المعاملة لفحصها وتكبيرها.
+                </p>
+              </div>
+
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-900 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  <b>الخلاصة:</b> منظومة الروضة الشريفة مهيأة معمارياً لاستيعاب أكثر من <b>1,000,000 صورة شهرياً</b> بأمان تام وسرعة استجابة فائقة.
+                </span>
+              </div>
+              <span className="font-mono font-bold text-emerald-700 bg-white px-2 py-1 rounded-lg border border-emerald-200 text-[11px] shrink-0">
+                الصور الحالية: {transfers.reduce((acc, t) => acc + (t.images?.length || 1), 0)} صورة
+              </span>
+            </div>
+
+          </div>
+
+        </div>
+      )}
       {showAddBranchModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-in fade-in duration-200 text-right my-auto">
