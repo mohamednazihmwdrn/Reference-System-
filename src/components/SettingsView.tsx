@@ -43,8 +43,12 @@ import {
   exportAllDataAsJSON, 
   importAllDataFromJSON, 
   resetAllDataToDefault,
-  COMPANY_INFO
+  COMPANY_INFO,
+  AuditorProfile,
+  loadAuditorCredentials,
+  saveAuditorCredentials
 } from '../utils/storage';
+import { apiUpdateAuditor } from '../utils/api';
 
 interface SettingsViewProps {
   branches: Branch[];
@@ -69,8 +73,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   // Navigation / Filter inside Settings
   const [activeTab, setActiveTab] = useState<'branches' | 'banks' | 'backup' | 'storage'>('branches');
-  const [branchFilter, setBranchFilter] = useState<'all' | 'store' | 'warehouse' | 'inactive'>('all');
+  const [branchFilter, setBranchFilter] = useState<'all' | 'store' | 'warehouse' | 'auditor' | 'inactive'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Auditor account profile state & modal
+  const [auditorProfile, setAuditorProfile] = useState<AuditorProfile>(loadAuditorCredentials());
+  const [isEditingAuditor, setIsEditingAuditor] = useState<boolean>(false);
+  const [auditorEditForm, setAuditorEditForm] = useState<AuditorProfile>(loadAuditorCredentials());
+  const [showAuditorPin, setShowAuditorPin] = useState<boolean>(false);
 
   // PIN visibility state: global toggle + per-branch individual toggle
   const [showAllPins, setShowAllPins] = useState(false);
@@ -184,6 +194,43 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     };
   };
 
+  // Auditor search match
+  const matchAuditorSearch = useMemo(() => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      auditorProfile.name.toLowerCase().includes(q) ||
+      (auditorProfile.code || 'aud-01').toLowerCase().includes(q) ||
+      auditorProfile.pinCode.includes(q) ||
+      (auditorProfile.phone ? auditorProfile.phone.includes(q) : false) ||
+      (auditorProfile.city ? auditorProfile.city.toLowerCase().includes(q) : false) ||
+      'المراجع'.includes(q) ||
+      'إدارة'.includes(q)
+    );
+  }, [searchQuery, auditorProfile]);
+
+  // Auditor profile edit handler
+  const handleSaveAuditorEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!auditorEditForm.name.trim() || !auditorEditForm.pinCode.trim()) return;
+
+    saveAuditorCredentials(auditorEditForm);
+    setAuditorProfile(auditorEditForm);
+    apiUpdateAuditor(auditorEditForm).catch(() => {});
+    setIsEditingAuditor(false);
+    triggerToast(`تم تحديث بيانات ورقم سري (${auditorEditForm.name}) بنجاح! الرقم السري الجديد: ${auditorEditForm.pinCode} ✓`);
+  };
+
+  // Quick reset auditor PIN
+  const handleQuickResetAuditorPin = () => {
+    const newPin = generateRandomPin();
+    const updated = { ...auditorProfile, pinCode: newPin };
+    saveAuditorCredentials(updated);
+    setAuditorProfile(updated);
+    apiUpdateAuditor(updated).catch(() => {});
+    triggerToast(`تم توليد رقم سري جديد للمراجع: ${newPin} 🎲`);
+  };
+
   // 1. ADD NEW BRANCH HANDLER
   const handleAddBranchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,13 +239,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const autoCode = addForm.code.trim().toUpperCase() || 
       (addForm.type === 'store' ? `ST-0${storeCount + 1}` : `WH-0${warehouseCount + 1}`);
 
-    const cleanRoleTitle = addForm.type === 'warehouse'
-      ? (addForm.name.startsWith('مخزن') ? `أمين ${addForm.name}` : `أمين مخزن ${addForm.name}`)
-      : (addForm.name.startsWith('معرض') ? `كاشير ${addForm.name}` : `كاشير معرض ${addForm.name}`);
+    const cleanName = addForm.name.trim();
 
     const newBranch: Branch = {
       id: `b_${Date.now()}`,
-      name: addForm.name.trim(),
+      name: cleanName,
       code: autoCode,
       city: addForm.city.trim() || 'القاهرة',
       address: addForm.address.trim(),
@@ -206,7 +251,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       pinCode: addForm.pin.trim() || generateRandomPin(),
       type: addForm.type,
       isActive: true,
-      defaultCashier: addForm.cashier.trim() || cleanRoleTitle,
+      defaultCashier: addForm.cashier.trim() || cleanName,
       notes: addForm.notes.trim(),
       createdAt: new Date().toISOString(),
     };
@@ -425,7 +470,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
 
         {/* Global Statistics Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3 border-t border-slate-800 text-center text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-3 border-t border-slate-800 text-center text-xs">
+          <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-2xl p-2.5">
+            <div className="text-[11px] text-emerald-400 font-bold flex items-center justify-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>حساب المراجع</span>
+            </div>
+            <div className="text-xl font-bold font-mono text-emerald-300 mt-0.5">1</div>
+            <div className="text-[10px] text-emerald-400/80">الإدارة المركزية (نشط)</div>
+          </div>
+
           <div className="bg-slate-800/60 rounded-2xl p-2.5">
             <div className="text-[11px] text-blue-400 font-bold flex items-center justify-center gap-1">
               <Store className="w-3.5 h-3.5" />
@@ -449,8 +503,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <Power className="w-3.5 h-3.5" />
               <span>الحسابات النشطة</span>
             </div>
-            <div className="text-xl font-bold font-mono text-white mt-0.5">{activeCount} / {branches.length}</div>
-            <div className="text-[10px] text-emerald-300">جاهزة لإرسال الإيصالات</div>
+            <div className="text-xl font-bold font-mono text-white mt-0.5">{activeCount + 1} / {branches.length + 1}</div>
+            <div className="text-[10px] text-emerald-300">جاهزة للاستخدام</div>
           </div>
 
           <div className="bg-slate-800/60 rounded-2xl p-2.5">
@@ -478,7 +532,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           }`}
         >
           <Building2 className="w-4 h-4" />
-          <span>إدارة المعارض والمخازن وكلمات السر ({branches.length})</span>
+          <span>إدارة كافة الحسابات والمراجع وكلمات السر ({branches.length + 1})</span>
         </button>
 
         <button
@@ -531,28 +585,43 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="bg-white border border-slate-200 rounded-3xl p-4 shadow-2xs space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               
-              {/* Add New Branch Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  setAddForm({
-                    name: '',
-                    code: `ST-0${storeCount + 1}`,
-                    city: 'القاهرة',
-                    address: '',
-                    phone: '',
-                    cashier: '',
-                    pin: generateRandomPin(),
-                    type: 'store',
-                    notes: '',
-                  });
-                  setShowAddBranchModal(true);
-                }}
-                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>إضافة معرض أو مخزن جديد</span>
-              </button>
+              {/* Action Buttons: Add Branch + Quick Edit Auditor */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddForm({
+                      name: '',
+                      code: `ST-0${storeCount + 1}`,
+                      city: 'القاهرة',
+                      address: '',
+                      phone: '',
+                      cashier: '',
+                      pin: generateRandomPin(),
+                      type: 'store',
+                      notes: '',
+                    });
+                    setShowAddBranchModal(true);
+                  }}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>إضافة معرض أو مخزن جديد</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuditorEditForm({ ...auditorProfile });
+                    setIsEditingAuditor(true);
+                  }}
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-blue-600/20 active:scale-95 transition-all cursor-pointer"
+                  title="تعديل اسم أو رقم سري أو بيانات حساب المراجع"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>تعديل حساب المراجع (PIN: {auditorProfile.pinCode})</span>
+                </button>
+              </div>
 
               {/* Reveal/Hide All PINs Toggle */}
               <div className="flex items-center gap-2">
@@ -611,7 +680,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   branchFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                كافة الفروع ({branches.length})
+                كافة الحسابات ({branches.length + 1})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setBranchFilter('auditor')}
+                className={`flex-1 py-1.5 px-3 rounded-xl transition-all whitespace-nowrap text-center flex items-center justify-center gap-1 cursor-pointer ${
+                  branchFilter === 'auditor' ? 'bg-white text-emerald-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>حساب المراجع</span>
+                <span className="font-mono text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded-full text-[10px]">1</span>
               </button>
 
               <button
@@ -651,8 +732,114 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
-          {/* Cards Grid: Complete Branches Management */}
+          {/* Cards Grid: Complete Branches & Reviewer Accounts Management */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            {/* 1. Reviewer Account Card (حساب المراجع المالي والإدارة) */}
+            {(branchFilter === 'all' || branchFilter === 'auditor') && matchAuditorSearch && (
+              <div className="bg-gradient-to-br from-white via-emerald-50/20 to-slate-50 rounded-3xl border-2 border-emerald-300 transition-all p-4 space-y-3.5 shadow-2xs hover:border-emerald-500 relative">
+                {/* Card Top: Identity, Name, Code, Status */}
+                <div className="flex items-start justify-between gap-2 pb-3 border-b border-emerald-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-11 h-11 rounded-2xl bg-emerald-600 flex items-center justify-center text-white text-xl font-bold shrink-0 shadow-md shadow-emerald-600/30">
+                      <ShieldCheck className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-black text-slate-900 text-sm sm:text-base">{auditorProfile.name}</h3>
+                        <span className="font-mono text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-lg border border-emerald-200">
+                          {auditorProfile.code || 'AUD-01'}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="font-bold px-1.5 py-0.2 rounded text-[10px] bg-emerald-100 text-emerald-900">
+                          الإدارة المالية والتدقيق
+                        </span>
+                        <span>·</span>
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-emerald-600" />
+                          <span>{auditorProfile.city || 'الإدارة المركزية'}</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold border border-emerald-300">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>حساب نشط دائم</span>
+                  </span>
+                </div>
+
+                {/* Body Details: PIN Code & Description */}
+                <div className="space-y-2 text-xs text-slate-600">
+                  <div className="flex items-center justify-between p-2.5 rounded-2xl bg-white border border-emerald-200 shadow-2xs">
+                    <div className="flex items-center gap-2">
+                      <KeyRound className="w-4 h-4 text-emerald-600" />
+                      <span className="font-bold text-slate-700">الرقم السري للمراجع (PIN):</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-sm font-black tracking-widest text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                        {showAllPins || showAuditorPin ? auditorProfile.pinCode : '••••'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowAuditorPin(!showAuditorPin)}
+                        className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
+                        title={showAuditorPin ? 'إخفاء الرقم السري' : 'إظهار الرقم السري'}
+                      >
+                        {showAuditorPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyPin(auditorProfile.pinCode, auditorProfile.name)}
+                        className="p-1 text-slate-400 hover:text-emerald-600 rounded-lg cursor-pointer"
+                        title="نسخ الرقم السري"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {auditorProfile.phone && (
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500 pr-1">
+                      <Phone className="w-3.5 h-3.5 text-slate-400" />
+                      <span>الهاتف: <b className="font-mono text-slate-700">{auditorProfile.phone}</b></span>
+                    </div>
+                  )}
+
+                  <div className="text-[11px] text-slate-500 bg-white/80 p-2 rounded-xl border border-slate-100">
+                    🛡️ {auditorProfile.description || 'صلاحية كاملة لمراجعة واستلام واعتماد إيصالات الفروع والطباعة والأرشفة وحذف العمليات'}
+                  </div>
+                </div>
+
+                {/* Actions: Edit Auditor & Reset PIN */}
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-emerald-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuditorEditForm({ ...auditorProfile });
+                      setIsEditingAuditor(true);
+                    }}
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                    title="تعديل اسم أو رقم سري أو بيانات حساب المراجع"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>تعديل بيانات المراجع</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleQuickResetAuditorPin}
+                    className="px-3 py-2 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-slate-200 transition-colors cursor-pointer"
+                    title="توليد رقم سري عشوائي جديد للمراجع"
+                  >
+                    <Dice5 className="w-3.5 h-3.5 text-slate-500" />
+                    <span>توليد PIN جديد</span>
+                  </button>
+                </div>
+              </div>
+            )}
             {filteredBranches.map((branch) => {
               const stats = getBranchStats(branch.id);
               const isStore = branch.type === 'store';
@@ -1565,6 +1752,166 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       )}
 
       {/* ========================================================================= */}
+      {/* MODAL 2.5: EDIT AUDITOR ACCOUNT MODAL (تعديل حساب المراجع والرقم السري) */}
+      {/* ========================================================================= */}
+      {isEditingAuditor && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-in fade-in duration-200 text-right my-auto">
+            
+            <div className="flex items-center justify-between pb-3 border-b border-emerald-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-md shadow-emerald-600/30">
+                  <ShieldCheck className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-slate-900">
+                    تعديل حساب المراجع (الإدارة المالية)
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    التحكم الكامل في الاسم، الرقم السري (PIN)، الهاتف، والصلاحيات
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditingAuditor(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAuditorEdit} className="space-y-3.5 text-xs">
+              
+              {/* Name & Code */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">اسم المراجع: *</label>
+                  <input
+                    type="text"
+                    required
+                    value={auditorEditForm.name}
+                    onChange={(e) => setAuditorEditForm({ ...auditorEditForm, name: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500"
+                    placeholder="مثال: المراجع"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">كود الحساب الإداري:</label>
+                  <input
+                    type="text"
+                    value={auditorEditForm.code || 'AUD-01'}
+                    onChange={(e) => setAuditorEditForm({ ...auditorEditForm, code: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-mono font-bold focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* PIN Code Edit */}
+              <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-emerald-950 block">الرقم السري للمراجع (PIN): *</label>
+                  <button
+                    type="button"
+                    onClick={() => setAuditorEditForm({ ...auditorEditForm, pinCode: generateRandomPin() })}
+                    className="text-emerald-800 hover:text-emerald-950 font-bold flex items-center gap-1 cursor-pointer text-[11px] bg-white px-2 py-0.5 rounded-lg border border-emerald-300 shadow-2xs"
+                  >
+                    <Dice5 className="w-3.5 h-3.5" />
+                    <span>توليد PIN عشوائي</span>
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showAuditorPin ? "text" : "password"}
+                    maxLength={10}
+                    required
+                    value={auditorEditForm.pinCode}
+                    onChange={(e) => setAuditorEditForm({ ...auditorEditForm, pinCode: e.target.value })}
+                    className="w-full bg-white border border-emerald-300 rounded-xl p-2.5 text-center font-mono text-2xl font-black tracking-widest text-emerald-950 focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAuditorPin(!showAuditorPin)}
+                    className="absolute left-3 top-3 text-slate-400 hover:text-slate-700"
+                  >
+                    {showAuditorPin ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                <span className="text-[10px] text-emerald-800 block">
+                  هذا هو الرقم السري الذي يستخدمه المراجع لتسجيل الدخول إلى لوحة التحكم والاعتماد.
+                </span>
+              </div>
+
+              {/* Phone & City */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">رقم هاتف المراجع للتواصل:</label>
+                  <input
+                    type="text"
+                    value={auditorEditForm.phone || ''}
+                    onChange={(e) => setAuditorEditForm({ ...auditorEditForm, phone: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-mono focus:ring-2 focus:ring-emerald-500"
+                    placeholder="01029190615"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">المقر الإداري / المدينة:</label>
+                  <input
+                    type="text"
+                    value={auditorEditForm.city || 'الإدارة المركزية'}
+                    onChange={(e) => setAuditorEditForm({ ...auditorEditForm, city: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Description / Permissions Note */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">وصف الصلاحيات والملاحظات:</label>
+                <textarea
+                  rows={2}
+                  value={auditorEditForm.description || ''}
+                  onChange={(e) => setAuditorEditForm({ ...auditorEditForm, description: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-emerald-500 resize-none"
+                  placeholder="صلاحية كاملة لمراجعة واستلام واعتماد إيصالات الفروع والطباعة والأرشفة وحذف العمليات"
+                />
+              </div>
+
+              {/* Status Banner */}
+              <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-900 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  حساب المراجع هو الحساب الإداري الأعلى في المنظومة وله صلاحية الاعتماد والرفض والحذف والطباعة.
+                </span>
+              </div>
+
+              {/* Modal Buttons */}
+              <div className="flex items-center gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs sm:text-sm shadow-md shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer"
+                >
+                  حفظ تعديلات حساب المراجع ✓
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsEditingAuditor(false)}
+                  className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                >
+                  إلغاء
+                </button>
+              </div>
+
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* MODAL 3: DELETE BRANCH CONFIRMATION (Requested: حذف أي معرض أو مخزن) */}
       {/* ========================================================================= */}
       {deletingBranch && (
@@ -1666,6 +2013,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-semibold">
+                  {/* Auditor Principal Row */}
+                  <tr className="bg-emerald-50/70 border-b-2 border-emerald-200">
+                    <td className="p-2.5 font-black text-emerald-950 flex items-center gap-1.5">
+                      <span>🛡️ {auditorProfile.name}</span>
+                      <span className="text-[10px] bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded font-bold">حساب الإدارة والمراجع</span>
+                    </td>
+                    <td className="p-2.5 text-emerald-800 font-bold">المراجع العام</td>
+                    <td className="p-2.5 font-mono text-emerald-900 font-bold">{auditorProfile.code || 'AUD-01'}</td>
+                    <td className="p-2.5 text-emerald-900 font-bold">{auditorProfile.name}</td>
+                    <td className="p-2.5 font-mono text-emerald-800">{auditorProfile.phone || '01029190615'}</td>
+                    <td className="p-2.5 bg-amber-100 font-mono font-black text-amber-950 text-sm tracking-widest">
+                      {auditorProfile.pinCode}
+                    </td>
+                    <td className="p-2.5">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        نشط دائم
+                      </span>
+                    </td>
+                  </tr>
+
                   {branches.map((b) => (
                     <tr key={b.id} className="hover:bg-slate-50">
                       <td className="p-2.5 font-bold text-slate-900">{b.name}</td>

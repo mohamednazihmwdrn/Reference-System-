@@ -19,6 +19,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { ChatMessage, Branch, UserSession } from '../types';
+import { normalizeBranchName } from '../utils/storage';
 import { apiFetchMessages, apiSendMessage, apiClearMessages } from '../utils/api';
 import { subscribeToChatMessages } from '../utils/firebase';
 import { soundManager } from '../utils/audio';
@@ -132,57 +133,52 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
     };
   }, [recordedAudioUrl]);
 
-  // Filter messages based on selected channel
+  // Filter messages: default to all messages visible to everyone (شات جماعي موحد)
   const filteredMessages = messages.filter((m) => {
     if (selectedTarget === 'all') {
-      return m.targetBranchId === 'all';
+      return true; // Show all messages to everyone in the group
     }
-    // Direct 1-on-1 between current user and target
-    const isSentToTarget = m.targetBranchId === selectedTarget && m.senderId === currentSenderId;
-    const isReceivedFromTarget = m.targetBranchId === currentSenderId && m.senderId === selectedTarget;
-    return isSentToTarget || isReceivedFromTarget;
+    // Filter view by specific branch or auditor if user clicks filter chip
+    return m.senderId === selectedTarget || m.targetBranchId === selectedTarget;
   });
 
-  // Calculate badge for incoming messages per channel
+  // Calculate message count & audio activity per branch
   const getChannelBadge = (branchId: string) => {
-    const incoming = messages.filter(
-      (m) => m.senderId === branchId && m.targetBranchId === currentSenderId
-    );
-    const hasVoice = incoming.some((m) => !!m.audioUrl);
-    return { count: incoming.length, hasVoice };
+    const list = messages.filter((m) => m.senderId === branchId);
+    const hasVoice = list.some((m) => !!m.audioUrl);
+    return { count: list.length, hasVoice };
   };
 
   // Target title & role label
   const getTargetDetails = () => {
     if (selectedTarget === 'all') {
       return {
-        title: 'غرفة العمليات العامة (جميع المعارض والمخازن)',
-        sub: 'محادثة جماعية مفتوحة لكافة المعارض والمخازن والمراجع',
+        title: 'الشات الجماعي العام (جميع الفروع والمخازن والمراجع)',
+        sub: 'محادثة جماعية موحدة — أي رسالة تُرسل هنا يراها الجميع فوراً',
         isGroup: true,
       };
     }
     if (selectedTarget === 'auditor_main') {
       return {
-        title: 'المراجع المالي والإدارة',
-        sub: 'محادثة خاصة ومباشرة مع الإدارة المالية',
+        title: 'رسائل المراجع المالي',
+        sub: 'تصفية رسائل الإدارة المالية والمراجع العام',
         isGroup: false,
       };
     }
     const b = branches.find((item) => item.id === selectedTarget);
     if (b) {
-      const isStore = b.type === 'store';
       return {
-        title: b.name,
-        sub: b.defaultCashier || (isStore ? `كاشير ${b.name}` : `أمين ${b.name}`),
+        title: `رسائل ${b.name}`,
+        sub: `تصفية الرسائل الصادرة والواردة لـ ${b.name}`,
         isGroup: false,
       };
     }
-    return { title: 'محادثة خاصة', sub: 'اتصال مباشر', isGroup: false };
+    return { title: 'محادثة جماعية', sub: 'اتصال موحد للجميع', isGroup: true };
   };
 
   const targetInfo = getTargetDetails();
 
-  // --- Send Text Message ---
+  // --- Send Text Message (Always broadcast to all so everyone sees it) ---
   const handleSendText = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!inputText.trim() || isSending) return;
@@ -195,7 +191,7 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
       senderId: currentSenderId,
       senderName: currentSenderName,
       senderRole: currentSession.role,
-      targetBranchId: selectedTarget,
+      targetBranchId: 'all', // Always broadcast to the whole company
       text: textToSend,
       createdAt: new Date().toISOString(),
     };
@@ -230,7 +226,7 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
         senderId: currentSenderId,
         senderName: currentSenderName,
         senderRole: currentSession.role,
-        targetBranchId: selectedTarget,
+        targetBranchId: 'all',
         text: '📷 صورة مرفقة',
         imageUrl: compressedDataUrl,
         createdAt: new Date().toISOString(),
@@ -370,7 +366,7 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
         senderId: currentSenderId,
         senderName: currentSenderName,
         senderRole: currentSession.role,
-        targetBranchId: selectedTarget,
+        targetBranchId: 'all',
         text: '🎙️ تسجيل صوتي',
         audioUrl: base64Audio,
         audioDuration: finalDuration,
@@ -472,12 +468,12 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-2 sm:px-4 pt-1 pb-3 space-y-2 select-none animate-in fade-in duration-200">
+    <div className="flex-1 flex flex-col h-full w-full max-w-4xl mx-auto px-1 sm:px-4 select-none animate-in fade-in duration-200 overflow-hidden">
       
       {/* ========================================================================= */}
       {/* 1. Destination Channel Selector Pills (العام vs المعارض vs المخازن vs المراجع) */}
       {/* ========================================================================= */}
-      <div className="bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-2xs space-y-1">
+      <div className="shrink-0 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-2xs space-y-1">
         <div className="text-[10px] font-bold text-slate-500 px-0.5 flex items-center justify-between">
           <span className="flex items-center gap-1">
             <Users className="w-3 h-3 text-blue-600" />
@@ -558,7 +554,7 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
       {/* ========================================================================= */}
       {/* 2. Compact Active Contact Header */}
       {/* ========================================================================= */}
-      <div className="bg-slate-900 text-white rounded-xl px-3 py-2 shadow-xs border border-slate-800 flex items-center justify-between gap-2">
+      <div className="shrink-0 bg-slate-900 text-white rounded-xl px-3 py-1.5 shadow-xs border border-slate-800 flex items-center justify-between gap-2 mt-1">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-black shadow-xs shrink-0">
             {targetInfo.isGroup ? <Users className="w-3.5 h-3.5" /> : <Store className="w-3.5 h-3.5" />}
@@ -594,11 +590,11 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. Messages Stream (Chat Bubbles + Audio Notes) */}
+      {/* 3. Messages Stream (Chat Bubbles + Audio Notes) - Fills ALL available space */}
       {/* ========================================================================= */}
       <div 
         ref={messagesContainerRef}
-        className="bg-slate-100/90 border border-slate-200 rounded-2xl p-2.5 min-h-[280px] max-h-[58vh] overflow-y-auto space-y-2 shadow-inner"
+        className="flex-1 overflow-y-auto bg-slate-100/90 border border-slate-200 rounded-2xl p-2.5 my-1.5 space-y-2 shadow-inner min-h-0"
       >
         {filteredMessages.length === 0 ? (
           <div className="text-center py-8 space-y-1.5 text-slate-500">
@@ -622,7 +618,7 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
               >
                 {/* Sender Title */}
                 <div className="flex items-center gap-1.5 text-[10px] text-slate-600 font-bold px-2 mb-0.5">
-                  <span>{msg.senderName}</span>
+                  <span>{normalizeBranchName(msg.senderName)}</span>
                 </div>
 
                 {/* Bubble */}
@@ -725,9 +721,9 @@ export const CompanyChatView: React.FC<CompanyChatViewProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 4. WhatsApp-Style Input Bar (Text, Photo, and Voice Note Recording) */}
+      {/* 4. WhatsApp-Style Input Bar (Fixed / Docked right above navigation bar) */}
       {/* ========================================================================= */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-2 shadow-sm">
+      <div className="shrink-0 bg-white border border-slate-200/90 rounded-2xl p-2 shadow-md z-20 mb-1">
         
         {/* Hidden Photo File Input */}
         <input 

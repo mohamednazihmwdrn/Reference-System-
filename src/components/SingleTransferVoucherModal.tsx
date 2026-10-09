@@ -29,15 +29,15 @@ export const SingleTransferVoucherModal: React.FC<SingleTransferVoucherModalProp
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto no-print">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto printable-modal-wrapper">
       
-      <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[95vh] flex flex-col overflow-hidden border border-slate-300">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[95vh] flex flex-col overflow-hidden border border-slate-300 printable-card">
         
-        {/* Top Control Bar */}
-        <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between border-b border-slate-800 shrink-0">
+        {/* Top Control Bar (Hidden on print) */}
+        <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between border-b border-slate-800 shrink-0 no-print">
           <div className="flex items-center gap-2">
             <Printer className="w-5 h-5 text-blue-400" />
-            <span className="font-bold text-sm">معاينة سند الحركة الفردية للطباعة</span>
+            <span className="font-bold text-sm">معاينة سند الحركة الفردية للطباعة و PDF</span>
             <span className="font-mono text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
               {transfer.invoiceNo}
             </span>
@@ -46,15 +46,23 @@ export const SingleTransferVoucherModal: React.FC<SingleTransferVoucherModalProp
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+              title="طباعة السند أو حفظه كملف PDF"
+            >
+              <span>📄 طباعة / حفظ بتنسيق PDF</span>
+            </button>
+
+            <button
+              onClick={handlePrint}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
             >
               <Printer className="w-4 h-4" />
-              <span>طباعة هذا السند الآن</span>
+              <span>طباعة 🖨️</span>
             </button>
 
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg"
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -62,7 +70,7 @@ export const SingleTransferVoucherModal: React.FC<SingleTransferVoucherModalProp
         </div>
 
         {/* Printable Document Area */}
-        <div className="flex-1 overflow-y-auto p-6 sm:p-8 text-slate-900 bg-white space-y-6" id="printable-voucher">
+        <div className="flex-1 overflow-y-auto p-6 sm:p-8 text-slate-900 bg-white space-y-6 printable-document" id="printable-voucher">
           
           {/* Header */}
           <div className="border-b-2 border-slate-900 pb-4 flex items-start justify-between">

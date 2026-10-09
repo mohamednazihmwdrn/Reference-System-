@@ -31,22 +31,70 @@
   background: #94a3b8;
 }
 
-/* Print styles for daily financial report */
+/* Print & PDF Export styles */
 @media print {
   body {
     background: white !important;
     color: black !important;
+    font-family: 'Cairo', 'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   
-  .no-print {
+  .no-print,
+  nav,
+  header,
+  footer,
+  aside,
+  .no-print-area {
     display: none !important;
   }
   
+  /* Make modal printable containers fill the whole printed page */
+  .printable-modal-wrapper {
+    position: static !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  .printable-card {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .printable-document {
+    padding: 10mm !important;
+    margin: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    width: 100% !important;
+    display: block !important;
+  }
+
   .print-only {
     display: block !important;
   }
   
   .print-break-inside-avoid {
     break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  @page {
+    size: auto;
+    margin: 10mm;
   }
 }

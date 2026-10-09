@@ -12,9 +12,10 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { Branch, UserSession } from '../types';
-import { AUDITOR_CREDENTIALS, COMPANY_INFO } from '../utils/storage';
+import { AUDITOR_CREDENTIALS, COMPANY_INFO, loadAuditorCredentials } from '../utils/storage';
 import { soundManager } from '../utils/audio';
 import { PWAInstallPrompt } from './PWAInstallPrompt';
+import { AppLogo } from './AppLogo';
 
 interface LoginScreenProps {
   branches: Branch[];
@@ -27,6 +28,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onLoginSuccess,
   onOpenPrivacyPolicy,
 }) => {
+  // Dynamic auditor profile loaded from storage
+  const [auditorProfile] = useState(loadAuditorCredentials());
+
   // Accounts options for the dropdown
   const storeBranches = branches.filter((b) => b.type === 'store');
   const warehouseBranches = branches.filter((b) => b.type === 'warehouse');
@@ -39,27 +43,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
   // Find the selected account details
   const getSelectedAccount = () => {
-    if (selectedAccountId === AUDITOR_CREDENTIALS.id) {
+    if (selectedAccountId === auditorProfile.id || selectedAccountId === 'auditor_main') {
       return {
-        id: AUDITOR_CREDENTIALS.id,
-        name: AUDITOR_CREDENTIALS.name,
+        id: auditorProfile.id,
+        name: auditorProfile.name,
         role: 'auditor' as const,
-        pinCode: AUDITOR_CREDENTIALS.pinCode,
-        userName: 'المراجع المالي والإدارة',
+        pinCode: auditorProfile.pinCode,
+        userName: auditorProfile.name,
       };
     }
     const b = branches.find((item) => item.id === selectedAccountId);
     if (b) {
-      const cleanRoleTitle = b.type === 'warehouse' 
-        ? (b.name.startsWith('مخزن') ? `أمين ${b.name}` : `أمين مخزن ${b.name}`)
-        : (b.name.startsWith('معرض') ? `كاشير ${b.name}` : `كاشير معرض ${b.name}`);
-
       return {
         id: b.id,
         name: b.name,
         role: 'branch_cashier' as const,
         pinCode: b.pinCode,
-        userName: b.defaultCashier || cleanRoleTitle,
+        userName: b.name,
         branchId: b.id,
       };
     }
@@ -112,16 +112,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-between p-4 selection:bg-blue-600 selection:text-white" dir="rtl">
       
       {/* Top Branding Bar */}
-      <div className="max-w-md mx-auto w-full pt-6 pb-2 text-center space-y-2">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white font-mono text-2xl font-black shadow-xl shadow-blue-600/30">
-          الروضة
+      <div className="max-w-md mx-auto w-full pt-6 pb-2 text-center space-y-3">
+        <div className="flex justify-center">
+          <AppLogo size="xl" />
         </div>
-        <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-          شركة الروضة الشريفة للتجارة
-        </h1>
-        <p className="text-xs text-slate-400">
-          منظومة التحقق والمطابقة اللحظية لتحويلات إنستا باي (IPN)
-        </p>
+        <div>
+          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+            شركة الروضة الشريفة للتجارة
+          </h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            منظومة التحقق والمطابقة اللحظية لتحويلات إنستا باي (IPN)
+          </p>
+        </div>
       </div>
 
       {/* Login Card with Professional Dropdown & Password Field */}
@@ -168,7 +170,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   <optgroup label="المعارض">
                     {storeBranches.map((b) => (
                       <option key={b.id} value={b.id}>
-                        🏪 {b.name} ({b.defaultCashier || b.code})
+                        🏪 {b.name}
                       </option>
                     ))}
                   </optgroup>
@@ -176,14 +178,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   <optgroup label="المخازن والمستودعات">
                     {warehouseBranches.map((b) => (
                       <option key={b.id} value={b.id}>
-                        📦 {b.name} ({b.defaultCashier || b.code})
+                        📦 {b.name}
                       </option>
                     ))}
                   </optgroup>
 
                   <optgroup label="الإدارة المالية والتدقيق">
-                    <option value={AUDITOR_CREDENTIALS.id}>
-                      🛡️ {AUDITOR_CREDENTIALS.name}
+                    <option value={auditorProfile.id}>
+                      🛡️ {auditorProfile.name}
                     </option>
                   </optgroup>
                 </select>
@@ -219,6 +221,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   )}
                 </button>
               </div>
+
+              {/* Auditor PIN helper button */}
+              {(selectedAccountId === auditorProfile.id || selectedAccountId === 'auditor_main') ? (
+                <div className="flex items-center justify-between p-2 rounded-xl bg-blue-950/60 border border-blue-800 text-[11px] text-blue-200 mt-1">
+                  <span>الرقم السري للمراجع هو: <strong className="font-mono text-amber-300 text-xs">{auditorProfile.pinCode}</strong></span>
+                  <button
+                    type="button"
+                    onClick={() => setPinPassword(auditorProfile.pinCode)}
+                    className="px-2 py-0.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer"
+                  >
+                    تعبئة {auditorProfile.pinCode}
+                  </button>
+                </div>
+              ) : null}
+
               <p className="text-[11px] text-slate-400 pt-0.5">
                 سيتذكر هذا الهاتف تسجيل الدخول تلقائياً ولن يطلب كلمة السر مرة أخرى إلا عند تسجيل الخروج.
               </p>

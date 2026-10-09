@@ -43,6 +43,7 @@ import {
   apiCreateBranch,
   apiUpdateBranch,
   apiDeleteBranch,
+  apiDeleteTransfer,
   apiClearAllTransfers,
   subscribeToLiveUpdates,
 } from './utils/api';
@@ -459,6 +460,16 @@ export default function App() {
     }
   };
 
+  // Reviewer deletes a transfer (if sent by mistake)
+  const handleDeleteTransfer = async (transferId: string) => {
+    setTransfers((prev) => prev.filter((t) => t.id !== transferId));
+    if (inspectingTransfer?.id === transferId) {
+      setInspectingTransfer(null);
+    }
+    await apiDeleteTransfer(transferId);
+    soundManager.playReject();
+  };
+
   // Branches Management Handlers (Reviewer / Admin)
   const handleUpdateBranches = async (updatedBranches: Branch[]) => {
     const previousBranches = branches;
@@ -622,7 +633,11 @@ export default function App() {
       )}
 
       {/* Main Content Router with exact clearance for mobile navigation bar */}
-      <main className="flex-1 pb-20 sm:pb-24 overflow-x-hidden">
+      <main className={`flex-1 ${
+        activeTab === 'chat' 
+          ? 'pb-16 sm:pb-2 flex flex-col h-[calc(100dvh-3.5rem)] overflow-hidden' 
+          : 'pb-20 sm:pb-24 overflow-x-hidden'
+      }`}>
         {activeTab === 'cashier' && (
           <CashierUploadView
             branches={branches}
@@ -657,6 +672,7 @@ export default function App() {
             onOpenPrintReport={openPrintReport}
             onPrintSingleVoucher={openVoucherModal}
             onReturnToReception={handleReturnToReception}
+            onDeleteTransfer={handleDeleteTransfer}
             onGoToSettings={() => handleTabChange('settings')}
             onClearAllTransfers={handleClearAllTransfers}
           />
@@ -678,6 +694,8 @@ export default function App() {
           <BankReconciliationView
             transfers={transfers}
             bankAccounts={bankAccounts}
+            branches={branches}
+            onUpdateBankAccounts={setBankAccounts}
             onApproveTransfer={handleApproveTransfer}
           />
         )}
@@ -695,24 +713,26 @@ export default function App() {
           />
         )}
 
-        {/* Subtle, Non-Intrusive Page Footer (Placed inside scrollable flow with bottom margin) */}
-        <footer className="text-center py-4 px-4 text-[10px] text-slate-400 border-t border-slate-200/80 bg-slate-50/90 mt-8 mb-4 no-print select-none">
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <span>{COMPANY_INFO.name}</span>
-            <span>·</span>
-            <span>برمجة وتطوير: <strong className="font-semibold text-slate-500">Mohamed Nazih</strong></span>
-            <span>·</span>
-            <span>هاتف الدعم: <a href="tel:01029190615" className="font-mono text-slate-500 hover:underline">01029190615</a></span>
-            <span>·</span>
-            <button
-              type="button"
-              onClick={openPrivacyModal}
-              className="text-blue-600 hover:underline cursor-pointer"
-            >
-              سياسة الخصوصية
-            </button>
-          </div>
-        </footer>
+        {/* Subtle, Non-Intrusive Page Footer (Hidden on Chat view to maximize screen for messages) */}
+        {activeTab !== 'chat' && (
+          <footer className="text-center py-4 px-4 text-[10px] text-slate-400 border-t border-slate-200/80 bg-slate-50/90 mt-8 mb-4 no-print select-none">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <span>{COMPANY_INFO.name}</span>
+              <span>·</span>
+              <span>برمجة وتطوير: <strong className="font-semibold text-slate-500">Mohamed Nazih</strong></span>
+              <span>·</span>
+              <span>هاتف الدعم: <a href="tel:01029190615" className="font-mono text-slate-500 hover:underline">01029190615</a></span>
+              <span>·</span>
+              <button
+                type="button"
+                onClick={openPrivacyModal}
+                className="text-blue-600 hover:underline cursor-pointer"
+              >
+                سياسة الخصوصية
+              </button>
+            </div>
+          </footer>
+        )}
       </main>
 
       {/* Ergonomic Mobile Bottom Navigation Bar */}
@@ -743,6 +763,8 @@ export default function App() {
           onNavigate={(nextItem) => setInspectingTransfer(nextItem)}
           onPrintVoucher={openVoucherModal}
           onReturnToReception={handleReturnToReception}
+          onDeleteTransfer={handleDeleteTransfer}
+          isAuditor={isAuditor}
         />
       )}
 

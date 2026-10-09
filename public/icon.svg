@@ -1,45 +1,47 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1e3a8a" />
-      <stop offset="50%" stop-color="#2563eb" />
-      <stop offset="100%" stop-color="#1d4ed8" />
+      <stop offset="0%" stop-color="#090d16" />
+      <stop offset="50%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e1b4b" />
     </linearGradient>
-    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff" />
-      <stop offset="100%" stop-color="#e2e8f0" />
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="60%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e3a8a" />
     </linearGradient>
-    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000" flood-opacity="0.35" />
+    <linearGradient id="boltGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="45%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#3b82f6" flood-opacity="0.45" />
     </filter>
   </defs>
 
-  <!-- Background Canvas -->
+  <!-- Canvas Background -->
   <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
 
   <!-- Outer Ring Accent -->
-  <rect x="24" y="24" width="464" height="464" rx="88" fill="none" stroke="#60a5fa" stroke-width="6" stroke-opacity="0.4" />
+  <rect x="22" y="22" width="468" height="468" rx="92" fill="none" stroke="#f59e0b" stroke-width="3" stroke-opacity="0.35" />
 
-  <!-- Central Shield / Security Symbol -->
-  <g filter="url(#shadow)">
-    <!-- Shield Outline -->
-    <path d="M256 96 L376 144 C376 264 256 348 256 376 C256 348 136 264 136 144 Z" fill="url(#shieldGrad)" />
-    
-    <!-- Inner Emblem: Building / Store + Verification Check -->
-    <!-- Store Roof -->
-    <path d="M192 196 L256 160 L320 196 L320 208 L192 208 Z" fill="#1e40af" />
-    
-    <!-- Store Pillars -->
-    <rect x="204" y="216" width="16" height="40" rx="3" fill="#1e40af" />
-    <rect x="248" y="216" width="16" height="40" rx="3" fill="#1e40af" />
-    <rect x="292" y="216" width="16" height="40" rx="3" fill="#1e40af" />
-    <rect x="188" y="258" width="136" height="10" rx="3" fill="#1e40af" />
-
-    <!-- Green Verification Badge -->
-    <circle cx="256" cy="316" r="34" fill="#10b981" />
-    <path d="M242 316 L252 326 L272 304" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Central Emblem: Hexagonal Shield -->
+  <g filter="url(#glow)">
+    <polygon points="256,44 440,136 440,368 256,460 72,368 72,136" fill="url(#shieldGrad)" stroke="#f59e0b" stroke-width="12" stroke-linejoin="round" />
+    <polygon points="256,74 410,154 410,352 256,432 102,352 102,154" fill="none" stroke="#10b981" stroke-width="6" stroke-opacity="0.75" stroke-linejoin="round" />
   </g>
 
-  <!-- Text: الروضة -->
-  <text x="256" y="440" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="44" fill="#ffffff" text-anchor="middle" letter-spacing="1">الروضة الشريفة</text>
+  <!-- Bank Pillars Arch Architecture (Symbol of Store Treasury & Ledger) -->
+  <path d="M168,160 L344,160 M188,160 L188,210 M256,160 L256,210 M324,160 L324,210 M156,210 L356,210" stroke="#93c5fd" stroke-width="8" stroke-linecap="round" opacity="0.8" />
+
+  <!-- InstaPay Instant Transfer Lightning Arrow -->
+  <path d="M276,170 L176,285 L248,285 L224,400 L344,265 L272,265 Z" fill="url(#boltGrad)" filter="url(#glow)" />
+
+  <!-- Financial Auditor Official Stamp / Verified Badge -->
+  <circle cx="372" cy="372" r="62" fill="#059669" stroke="#ffffff" stroke-width="9" />
+  <path d="M346,372 L366,392 L402,350" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Arabic Typography -->
+  <text x="256" y="492" font-family="'Cairo', system-ui, sans-serif" font-weight="900" font-size="26" fill="#f8fafc" text-anchor="middle">الروضة الشريفة · تدقيق إنستا باي</text>
 </svg>

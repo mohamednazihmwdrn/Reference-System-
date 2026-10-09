@@ -34,6 +34,7 @@ import {
   Archive,
   Sparkles,
   Undo2,
+  Trash2,
   CheckCheck,
   Send,
   Settings
@@ -54,6 +55,7 @@ interface AccountantDashboardProps {
   onOpenPrintReport: () => void;
   onPrintSingleVoucher: (transfer: TransferItem) => void;
   onReturnToReception?: (transferId: string) => void;
+  onDeleteTransfer?: (transferId: string) => void;
   onGoToSettings?: () => void;
   onClearAllTransfers?: () => void;
 }
@@ -68,6 +70,7 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
   onOpenPrintReport,
   onPrintSingleVoucher,
   onReturnToReception,
+  onDeleteTransfer,
   onGoToSettings,
   onClearAllTransfers,
 }) => {
@@ -998,6 +1001,21 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
                         <Check className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">اعتماد</span>
                       </button>
+                      {onDeleteTransfer && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`هل أنت متأكد من حذف هذه المعاملة (فاتورة: ${item.invoiceNo || 'غير محدد'}) نهائياً؟\n(في حال أُرسلت بالخطأ من الفرع)`)) {
+                              onDeleteTransfer(item.id);
+                            }
+                          }}
+                          className="p-1 text-slate-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                          title="حذف المعاملة نهائياً (أُرسلت بالخطأ)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <div className="p-1 text-slate-400 hover:text-blue-600 rounded-lg group-hover:text-blue-600 transition-colors">
                         <ChevronLeft className="w-4 h-4" />
                       </div>
@@ -1015,6 +1033,21 @@ export const AccountantDashboard: React.FC<AccountantDashboardProps> = ({
                           title="إعادة المعاملة للاستقبال"
                         >
                           <Undo2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {onDeleteTransfer && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`هل أنت متأكد من حذف هذه المعاملة (فاتورة: ${item.invoiceNo || 'غير محدد'}) نهائياً؟\n(في حال أُرسلت بالخطأ)`)) {
+                              onDeleteTransfer(item.id);
+                            }
+                          }}
+                          className="p-1 text-slate-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                          title="حذف المعاملة نهائياً"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
                       <div className="p-1 text-slate-400 hover:text-blue-600 rounded-lg group-hover:text-blue-600 transition-colors">

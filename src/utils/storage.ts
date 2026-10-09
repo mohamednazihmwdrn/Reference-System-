@@ -8,15 +8,56 @@ const STORAGE_KEYS = {
   LAST_CASHIER_NAME: 'rawda_last_cashier_name',
   SOUND_ENABLED: 'rawda_sound_enabled',
   USER_SESSION: 'rawda_user_session_v3',
+  AUDITOR_CREDENTIALS: 'rawda_auditor_credentials_v3',
 };
 
-export const AUDITOR_CREDENTIALS = {
+export interface AuditorProfile {
+  id: string;
+  name: string;
+  role: 'auditor';
+  pinCode: string;
+  phone?: string;
+  code?: string;
+  city?: string;
+  description?: string;
+}
+
+export const DEFAULT_AUDITOR: AuditorProfile = {
   id: 'auditor_main',
-  name: 'الإدارة المالية والمراجعة (المراجع العام)',
-  role: 'auditor' as const,
+  name: 'المراجع',
+  role: 'auditor',
   pinCode: '9999',
-  description: 'صلاحية كاملة لمراجعة واستلام واعتماد إيصالات الفروع والطباعة والأرشفة',
+  phone: '01029190615',
+  code: 'AUD-01',
+  city: 'الإدارة المركزية',
+  description: 'صلاحية كاملة لمراجعة واستلام واعتماد إيصالات الفروع والطباعة والأرشفة وحذف العمليات',
 };
+
+export const AUDITOR_CREDENTIALS = DEFAULT_AUDITOR;
+
+export function loadAuditorCredentials(): AuditorProfile {
+  if (typeof window === 'undefined') return DEFAULT_AUDITOR;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.AUDITOR_CREDENTIALS);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.AUDITOR_CREDENTIALS, JSON.stringify(DEFAULT_AUDITOR));
+      return DEFAULT_AUDITOR;
+    }
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_AUDITOR, ...parsed };
+  } catch {
+    return DEFAULT_AUDITOR;
+  }
+}
+
+export function saveAuditorCredentials(creds: AuditorProfile) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.AUDITOR_CREDENTIALS, JSON.stringify(creds));
+  } catch (err) {
+    console.error('Failed to save auditor credentials', err);
+  }
+}
 
 export const COMPANY_INFO = {
   name: 'شركة الروضة الشريفة للتجارة والتوريدات',
@@ -29,93 +70,87 @@ export const COMPANY_INFO = {
   companyNotice: 'حقوق الملكية التجارية والبيانات محفوظة لشركة الروضة الشريفة © 2026',
 };
 
+export function normalizeBranchName(name: string): string {
+  const trimmed = (name || '').trim();
+  if (trimmed.includes('الروضة') || trimmed.includes('روضة')) return 'الروضة مكرم';
+  if (trimmed.includes('صفا') || trimmed.includes('الصفا')) return 'الصفا مكرم';
+  if (trimmed.includes('مودرن')) return 'مودرن';
+  if (trimmed.includes('بيس')) return 'بيس';
+  if (trimmed.includes('النحاس') || trimmed.includes('نحاس')) return 'النحاس';
+  if (trimmed.includes('النادي') || trimmed.includes('نادي')) return 'النادي';
+  return trimmed.replace(/^(محل|معرض|مخزن|كاشير|فرع|أمين)\s+/g, '').trim() || trimmed;
+}
+
 export const DEFAULT_BRANCHES: Branch[] = [
   {
     id: 'b_rawda',
-    name: 'معرض الروضة الشريفة',
+    name: 'الروضة مكرم',
     code: 'ST-01',
     city: 'الفرع الرئيسي',
     phone: '01029190615',
     pinCode: '1001',
     type: 'store',
     isActive: true,
-    defaultCashier: 'كاشير معرض الروضة الشريفة',
+    defaultCashier: 'الروضة مكرم',
   },
   {
     id: 'b_safa',
-    name: 'معرض صفا مكرم',
+    name: 'الصفا مكرم',
     code: 'ST-02',
     city: 'القاهرة',
     phone: '01022334455',
     pinCode: '2002',
     type: 'store',
     isActive: true,
-    defaultCashier: 'كاشير معرض صفا مكرم',
+    defaultCashier: 'الصفا مكرم',
   },
   {
     id: 'b_modern',
-    name: 'معرض مودرن',
+    name: 'مودرن',
     code: 'ST-03',
     city: 'القاهرة',
     phone: '01033445566',
     pinCode: '3003',
     type: 'store',
     isActive: true,
-    defaultCashier: 'كاشير معرض مودرن',
+    defaultCashier: 'مودرن',
+  },
+  {
+    id: 'b_peace',
+    name: 'بيس',
+    code: 'ST-04',
+    city: 'القاهرة',
+    phone: '01066778899',
+    pinCode: '6006',
+    type: 'store',
+    isActive: true,
+    defaultCashier: 'بيس',
   },
   {
     id: 'b_nadi',
-    name: 'مخزن النادي',
+    name: 'النادي',
     code: 'WH-01',
     city: 'المعادي',
     phone: '01044556677',
     pinCode: '4004',
     type: 'warehouse',
     isActive: true,
-    defaultCashier: 'أمين مخزن النادي',
+    defaultCashier: 'النادي',
   },
   {
     id: 'b_nahas',
-    name: 'مخزن النحاس',
+    name: 'النحاس',
     code: 'WH-02',
     city: 'مصر الجديدة',
     phone: '01055667788',
     pinCode: '5005',
     type: 'warehouse',
     isActive: true,
-    defaultCashier: 'أمين مخزن النحاس',
+    defaultCashier: 'النحاس',
   },
 ];
 
-export const DEFAULT_BANK_ACCOUNTS: BankAccount[] = [
-  {
-    id: 'ba_nbe',
-    bankName: 'البنك الأهلي المصري (NBE)',
-    accountName: 'شركة الروضة الشريفة',
-    accountNumber: '10293847561001',
-    instapayIpa: 'alrawda.store@instapay',
-    phone: '01029190615',
-    isActive: true,
-  },
-  {
-    id: 'ba_cib',
-    bankName: 'البنك التجاري الدولي (CIB)',
-    accountName: 'شركة الروضة الشريفة - حساب التحصيلات',
-    accountNumber: '100049281723',
-    instapayIpa: 'alrawda.pos@instapay',
-    phone: '01029190615',
-    isActive: true,
-  },
-  {
-    id: 'ba_misr',
-    bankName: 'بنك مصر (BM)',
-    accountName: 'شركة الروضة الشريفة',
-    accountNumber: '124009837162',
-    instapayIpa: 'alrawda.co@instapay',
-    phone: '01029190615',
-    isActive: true,
-  },
-];
+export const DEFAULT_BANK_ACCOUNTS: BankAccount[] = [];
 
 export const SAMPLE_RECEIPT_1 = '/src/assets/images/instapay_sample_receipt_1791231113924.jpg';
 export const SAMPLE_RECEIPT_2 = '/src/assets/images/instapay_sample_receipt_two_1791231126875.jpg';
@@ -129,7 +164,15 @@ export function loadUserSession(): UserSession | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.USER_SESSION);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const session: UserSession = JSON.parse(raw);
+    if (session.role === 'auditor') {
+      session.branchName = 'المراجع';
+      session.userName = 'المراجع';
+    } else if (session.branchName) {
+      session.branchName = normalizeBranchName(session.branchName);
+      session.userName = session.branchName;
+    }
+    return session;
   } catch {
     return null;
   }
@@ -212,7 +255,11 @@ export function loadBranches(): Branch[] {
       localStorage.setItem(STORAGE_KEYS.BRANCHES, JSON.stringify(DEFAULT_BRANCHES));
       return DEFAULT_BRANCHES;
     }
-    return JSON.parse(raw);
+    const list: Branch[] = JSON.parse(raw);
+    if (!Array.isArray(list) || list.length === 0) {
+      return DEFAULT_BRANCHES;
+    }
+    return list;
   } catch {
     return DEFAULT_BRANCHES;
   }
@@ -228,16 +275,19 @@ export function saveBranches(branches: Branch[]) {
 }
 
 export function loadBankAccounts(): BankAccount[] {
-  if (typeof window === 'undefined') return DEFAULT_BANK_ACCOUNTS;
+  if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.BANK_ACCOUNTS);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.BANK_ACCOUNTS, JSON.stringify(DEFAULT_BANK_ACCOUNTS));
-      return DEFAULT_BANK_ACCOUNTS;
+    if (!raw) return [];
+    const parsed: BankAccount[] = JSON.parse(raw);
+    // If it contains the old mock demo accounts from previous testing, purge for clean live launch
+    if (Array.isArray(parsed) && parsed.some(b => b.id === 'ba_nbe' || b.id === 'ba_cib' || b.id === 'ba_misr')) {
+      localStorage.setItem(STORAGE_KEYS.BANK_ACCOUNTS, JSON.stringify([]));
+      return [];
     }
-    return JSON.parse(raw);
+    return parsed;
   } catch {
-    return DEFAULT_BANK_ACCOUNTS;
+    return [];
   }
 }
 

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Branch, UserSession } from '../types';
 import { PWAInstallPrompt } from './PWAInstallPrompt';
+import { AppLogo } from './AppLogo';
 
 export type ActiveTab = 'cashier' | 'cashier_feed' | 'dashboard' | 'bank_recon' | 'settings' | 'chat';
 
@@ -56,9 +57,7 @@ export const Header: React.FC<HeaderProps> = ({
           
           {/* Brand & Active Branch Badge - strictly locked per account */}
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-xs text-white shadow-inner shrink-0">
-              الروضة
-            </div>
+            <AppLogo size="sm" />
             
             {isAuditor ? (
               <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-950/70 border border-emerald-700/70 rounded-full text-xs font-semibold text-emerald-200">

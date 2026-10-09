@@ -9,7 +9,8 @@ import {
   query, 
   orderBy, 
   limit, 
-  getDocFromServer 
+  getDocFromServer,
+  deleteDoc 
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { TransferItem, ChatMessage, Branch } from '../types';
@@ -125,6 +126,19 @@ export async function saveTransferToFirestore(transfer: TransferItem): Promise<v
     await setDoc(docRef, cleanData, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+/**
+ * Delete a transfer from Firestore
+ */
+export async function deleteTransferFromFirestore(id: string): Promise<void> {
+  const path = `transfers/${id}`;
+  try {
+    const docRef = doc(db, 'transfers', id);
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
 

@@ -5,10 +5,14 @@ import {
   loadBranches, 
   saveBranches, 
   DEFAULT_BRANCHES, 
-  INITIAL_TRANSFERS 
+  INITIAL_TRANSFERS,
+  AuditorProfile,
+  loadAuditorCredentials,
+  saveAuditorCredentials
 } from './storage';
 import { 
   saveTransferToFirestore, 
+  deleteTransferFromFirestore,
   subscribeToTransfers, 
   sendMessageToFirestore, 
   subscribeToChatMessages, 
@@ -90,6 +94,27 @@ export async function apiUpdateTransfer(
     const updated = local.map((t) => (t.id === id ? { ...t, ...updates } : t));
     saveTransfers(updated);
     return updated.find((t) => t.id === id) || null;
+  }
+}
+
+export async function apiDeleteTransfer(id: string): Promise<boolean> {
+  // 1. Delete from Firestore immediately
+  deleteTransferFromFirestore(id).catch((err) => {
+    console.warn('Firestore transfer delete fallback:', err);
+  });
+
+  // 2. Delete locally
+  const local = loadTransfers();
+  const updated = local.filter((t) => t.id !== id);
+  saveTransfers(updated);
+
+  // 3. Delete from Express server
+  try {
+    const res = await fetch(`/api/transfers/${id}`, { method: 'DELETE' });
+    return res.ok;
+  } catch (err) {
+    console.warn('Network error deleting transfer:', err);
+    return true;
   }
 }
 
@@ -176,6 +201,38 @@ export async function apiDeleteBranch(id: string): Promise<boolean> {
     const updated = local.filter((b) => b.id !== id);
     saveBranches(updated);
     return true;
+  }
+}
+
+// 2.5 Auditor Profile API
+export async function apiFetchAuditor(): Promise<AuditorProfile> {
+  try {
+    const res = await fetch('/api/auditor');
+    if (!res.ok) throw new Error('Failed to fetch auditor');
+    const data = await res.json();
+    saveAuditorCredentials(data);
+    return data;
+  } catch (err) {
+    return loadAuditorCredentials();
+  }
+}
+
+export async function apiUpdateAuditor(creds: Partial<AuditorProfile>): Promise<AuditorProfile> {
+  const current = loadAuditorCredentials();
+  const merged: AuditorProfile = { ...current, ...creds };
+  saveAuditorCredentials(merged);
+
+  try {
+    const res = await fetch('/api/auditor', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(merged),
+    });
+    if (!res.ok) throw new Error('Failed to update auditor');
+    return await res.json();
+  } catch (err) {
+    console.warn('Network error updating auditor, saved locally:', err);
+    return merged;
   }
 }
 

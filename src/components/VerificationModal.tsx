@@ -25,7 +25,8 @@ import {
   Smartphone,
   SplitSquareVertical,
   Printer,
-  Undo2
+  Undo2,
+  Trash2
 } from 'lucide-react';
 import { TransferItem } from '../types';
 import { numberToArabicWords } from '../utils/numberToWordsArabic';
@@ -42,6 +43,8 @@ interface VerificationModalProps {
   onNavigate: (transfer: TransferItem) => void;
   onPrintVoucher?: (transfer: TransferItem) => void;
   onReturnToReception?: (transferId: string) => void;
+  onDeleteTransfer?: (transferId: string) => void;
+  isAuditor?: boolean;
 }
 
 const COMMON_REJECTION_REASONS = [
@@ -63,6 +66,8 @@ export const VerificationModal: React.FC<VerificationModalProps> = ({
   onNavigate,
   onPrintVoucher,
   onReturnToReception,
+  onDeleteTransfer,
+  isAuditor = true,
 }) => {
   // All hooks must be top-level unconditional
   const [activePhotoIndex, setActivePhotoIndex] = useState<number>(0);
@@ -543,9 +548,20 @@ export const VerificationModal: React.FC<VerificationModalProps> = ({
               </div>
             ) : null}
 
-            {/* Action Buttons based on Transfer Status */}
+            {/* Action Buttons based on Transfer Status & Role */}
             <div className="mt-auto pt-2 border-t border-slate-100 space-y-2">
-              {transfer.status === 'verified' ? (
+              {!isAuditor ? (
+                /* Non-Auditor (Cashier / Warehouse) Read-Only Card */
+                <div className="bg-slate-100 border border-slate-200 rounded-xl p-3 text-slate-700 text-xs text-center space-y-1">
+                  <div className="font-bold flex items-center justify-center gap-1.5 text-slate-800">
+                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                    <span>صلاحية العرض والمتابعة فقط</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    الاعتماد والرفض وإدارة الحسابات مقتصرة بالكامل على المراجع المالي فقط.
+                  </p>
+                </div>
+              ) : transfer.status === 'verified' ? (
                 /* Verified Transfer Actions */
                 <div className="space-y-2">
                   <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-emerald-900 text-xs">
@@ -591,6 +607,23 @@ export const VerificationModal: React.FC<VerificationModalProps> = ({
                       </button>
                     )}
                   </div>
+
+                  {onDeleteTransfer && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`هل أنت متأكد من حذف هذه المعاملة (فاتورة: ${transfer.invoiceNo || 'غير محدد'}) نهائياً؟\nاستخدم هذا الخيار في حال تم إرسال الإيصال بالخطأ.`)) {
+                          onDeleteTransfer(transfer.id);
+                          onClose();
+                        }
+                      }}
+                      className="w-full bg-white hover:bg-red-50 text-red-600 hover:text-red-700 font-bold py-2 px-3 rounded-xl text-xs border border-red-200 hover:border-red-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      title="حذف العملية نهائياً إذا كانت مرسلة بالخطأ"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                      <span>حذف العملية (أُرسلت بالخطأ)</span>
+                    </button>
+                  )}
                 </div>
               ) : transfer.status === 'rejected' ? (
                 /* Rejected Transfer Actions */
@@ -613,6 +646,23 @@ export const VerificationModal: React.FC<VerificationModalProps> = ({
                     <Check className="w-4 h-4" />
                     <span>تغيير الحالة إلى معتمد وترحيل للأرشيف</span>
                   </button>
+
+                  {onDeleteTransfer && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`هل أنت متأكد من حذف هذه المعاملة (فاتورة: ${transfer.invoiceNo || 'غير محدد'}) نهائياً؟\nاستخدم هذا الخيار في حال تم إرسال الإيصال بالخطأ.`)) {
+                          onDeleteTransfer(transfer.id);
+                          onClose();
+                        }
+                      }}
+                      className="w-full bg-white hover:bg-red-50 text-red-600 hover:text-red-700 font-bold py-2 px-3 rounded-xl text-xs border border-red-200 hover:border-red-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      title="حذف العملية نهائياً إذا كانت مرسلة بالخطأ"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                      <span>حذف العملية (أُرسلت بالخطأ)</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 /* Pending Transfer Actions */
@@ -636,7 +686,7 @@ export const VerificationModal: React.FC<VerificationModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setShowRejectForm(true)}
-                        className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-semibold py-2 px-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                        className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-semibold py-2 px-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <XCircle className="w-4 h-4" />
                         <span>رفض التحويل</span>
@@ -650,12 +700,29 @@ export const VerificationModal: React.FC<VerificationModalProps> = ({
                           if (hasNext) handleNext();
                           else onClose();
                         }}
-                        className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-semibold py-2 px-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                        className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-semibold py-2 px-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <HelpCircle className="w-4 h-4" />
                         <span>طلب إعادة تصوير</span>
                       </button>
                     </div>
+                  )}
+
+                  {onDeleteTransfer && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`هل أنت متأكد من حذف هذه المعاملة (فاتورة: ${transfer.invoiceNo || 'غير محدد'}) نهائياً؟\nاستخدم هذا الخيار في حال تم إرسال الإيصال بالخطأ.`)) {
+                          onDeleteTransfer(transfer.id);
+                          onClose();
+                        }
+                      }}
+                      className="w-full bg-white hover:bg-red-50 text-red-600 hover:text-red-700 font-bold py-2 px-3 rounded-xl text-xs border border-red-200 hover:border-red-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      title="حذف العملية نهائياً إذا كانت مرسلة بالخطأ"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                      <span>حذف العملية (أُرسلت بالخطأ)</span>
+                    </button>
                   )}
                 </>
               )}

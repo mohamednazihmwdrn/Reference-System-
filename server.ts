@@ -53,91 +53,74 @@ const DEFAULT_SEED = {
   branches: [
     {
       id: 'b_rawda',
-      name: 'معرض الروضة الشريفة',
+      name: 'الروضة مكرم',
       code: 'ST-01',
       city: 'الفرع الرئيسي',
       phone: '01029190615',
       pinCode: '1001',
       type: 'store',
       isActive: true,
-      defaultCashier: 'كاشير معرض الروضة الشريفة',
+      defaultCashier: 'الروضة مكرم',
     },
     {
       id: 'b_safa',
-      name: 'معرض صفا مكرم',
+      name: 'الصفا مكرم',
       code: 'ST-02',
       city: 'القاهرة',
       phone: '01022334455',
       pinCode: '2002',
       type: 'store',
       isActive: true,
-      defaultCashier: 'كاشير معرض صفا مكرم',
+      defaultCashier: 'الصفا مكرم',
     },
     {
       id: 'b_modern',
-      name: 'معرض مودرن',
+      name: 'مودرن',
       code: 'ST-03',
       city: 'القاهرة',
       phone: '01033445566',
       pinCode: '3003',
       type: 'store',
       isActive: true,
-      defaultCashier: 'كاشير معرض مودرن',
+      defaultCashier: 'مودرن',
+    },
+    {
+      id: 'b_peace',
+      name: 'بيس',
+      code: 'ST-04',
+      city: 'القاهرة',
+      phone: '01066778899',
+      pinCode: '6006',
+      type: 'store',
+      isActive: true,
+      defaultCashier: 'بيس',
     },
     {
       id: 'b_nadi',
-      name: 'مخزن النادي',
+      name: 'النادي',
       code: 'WH-01',
       city: 'المعادي',
       phone: '01044556677',
       pinCode: '4004',
       type: 'warehouse',
       isActive: true,
-      defaultCashier: 'أمين مخزن النادي',
+      defaultCashier: 'النادي',
     },
     {
       id: 'b_nahas',
-      name: 'مخزن النحاس',
+      name: 'النحاس',
       code: 'WH-02',
       city: 'مصر الجديدة',
       phone: '01055667788',
       pinCode: '5005',
       type: 'warehouse',
       isActive: true,
-      defaultCashier: 'أمين مخزن النحاس',
+      defaultCashier: 'النحاس',
     },
   ],
   transfers: [] as Array<any>,
   messages: [] as Array<any>,
-  bankAccounts: [
-    {
-      id: 'ba_nbe',
-      bankName: 'البنك الأهلي المصري (NBE)',
-      accountName: 'شركة الروضة الشريفة',
-      accountNumber: '10293847561001',
-      instapayIpa: 'alrawda.store@instapay',
-      phone: '01029190615',
-      isActive: true,
-    },
-    {
-      id: 'ba_cib',
-      bankName: 'البنك التجاري الدولي (CIB)',
-      accountName: 'شركة الروضة الشريفة - حساب التحصيلات',
-      accountNumber: '100049281723',
-      instapayIpa: 'alrawda.pos@instapay',
-      phone: '01029190615',
-      isActive: true,
-    },
-    {
-      id: 'ba_misr',
-      bankName: 'بنك مصر (BM)',
-      accountName: 'شركة الروضة الشريفة',
-      accountNumber: '124009837162',
-      instapayIpa: 'alrawda.co@instapay',
-      phone: '01029190615',
-      isActive: true,
-    },
-  ],
+  bankAccounts: [] as Array<any>,
   auditorPin: '9999',
 };
 
@@ -394,6 +377,31 @@ app.delete('/api/branches/:id', (req, res) => {
   db.branches = (db.branches || []).filter((b: { id: string }) => b.id !== id);
   writeDb(db);
   res.json({ success: true });
+});
+
+// 2.5 AUDITOR PROFILE API (Edit Reviewer Credentials & PIN)
+app.get('/api/auditor', (_req, res) => {
+  const db = readDb();
+  res.json(db.auditor || {
+    id: 'auditor_main',
+    name: 'المراجع',
+    role: 'auditor',
+    pinCode: db.auditorPin || '9999',
+    phone: '01029190615',
+    code: 'AUD-01',
+    city: 'الإدارة المركزية',
+    description: 'صلاحية كاملة لمراجعة واستلام واعتماد إيصالات الفروع والطباعة والأرشفة وحذف العمليات',
+  });
+});
+
+app.put('/api/auditor', (req, res) => {
+  const db = readDb();
+  db.auditor = { ...(db.auditor || {}), ...req.body };
+  if (req.body.pinCode) {
+    db.auditorPin = req.body.pinCode;
+  }
+  writeDb(db);
+  res.json(db.auditor);
 });
 
 // 3. BANK ACCOUNTS API

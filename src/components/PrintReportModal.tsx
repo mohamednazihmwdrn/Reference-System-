@@ -47,15 +47,15 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto no-print">
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto printable-modal-wrapper">
       
-      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-300">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-300 printable-card">
         
-        {/* Modal Controls Bar */}
-        <div className="bg-slate-900 text-white px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        {/* Modal Controls Bar (Hidden on Print) */}
+        <div className="bg-slate-900 text-white px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 shrink-0 no-print">
           <div className="flex items-center gap-2">
             <Printer className="w-5 h-5 text-blue-400" />
-            <span className="font-bold text-sm">معاينة تقرير المطابقة اليومية للطباعة</span>
+            <span className="font-bold text-sm">معاينة تقرير المطابقة للطباعة و PDF</span>
           </div>
 
           {/* Quick Branch Filter for Print */}
@@ -78,10 +78,18 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+              title="طباعة التقرير أو حفظه كملف PDF"
+            >
+              <span>📄 طباعة / حفظ بتنسيق PDF</span>
+            </button>
+
+            <button
+              onClick={handlePrint}
               className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Printer className="w-4 h-4" />
-              <span>طباعة هذا التقرير الآن</span>
+              <span>طباعة 🖨️</span>
             </button>
 
             <button
@@ -94,7 +102,7 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
         </div>
 
         {/* Printable Document Area */}
-        <div className="flex-1 overflow-y-auto p-8 text-slate-900 bg-white" id="printable-sheet">
+        <div className="flex-1 overflow-y-auto p-8 text-slate-900 bg-white printable-document" id="printable-sheet">
           
           {/* Company & Document Header */}
           <div className="border-b-2 border-slate-900 pb-4 mb-6 flex items-start justify-between">
