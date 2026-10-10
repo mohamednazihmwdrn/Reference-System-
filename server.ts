@@ -276,9 +276,34 @@ app.get('/api/messages', (_req, res) => {
 
 app.post('/api/messages', (req, res) => {
   const db = readDb();
+  const msgId = req.body.id || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+  // Deduplication check 1: Exact ID match
+  const existingById = (db.messages || []).find((m: { id: string }) => m.id === msgId);
+  if (existingById) {
+    return res.status(200).json(existingById);
+  }
+
+  // Deduplication check 2: Same sender, same text, within 3 seconds
+  if (req.body.text && !req.body.audioUrl && !req.body.imageUrl) {
+    const isRecentDuplicate = (db.messages || []).some(
+      (m: { senderId: string; text: string; createdAt: string }) =>
+        m.senderId === req.body.senderId &&
+        m.text === req.body.text &&
+        Math.abs(Date.now() - new Date(m.createdAt).getTime()) < 3000
+    );
+    if (isRecentDuplicate) {
+      const match = (db.messages || []).find(
+        (m: { senderId: string; text: string }) =>
+          m.senderId === req.body.senderId && m.text === req.body.text
+      );
+      return res.status(200).json(match || { id: msgId, ...req.body });
+    }
+  }
+
   const savedImageUrl = req.body.imageUrl ? saveBase64Image(req.body.imageUrl) : null;
   const newMsg = {
-    id: req.body.id || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    id: msgId,
     senderId: req.body.senderId,
     senderName: req.body.senderName, // e.g. "كاشير معرض صفا مكرم"
     senderRole: req.body.senderRole,
@@ -288,17 +313,38 @@ app.post('/api/messages', (req, res) => {
     audioDuration: req.body.audioDuration || 0,
     imageUrl: savedImageUrl,
     isWalkieTalkie: Boolean(req.body.isWalkieTalkie), // instant push-to-talk broadcast
-    createdAt: new Date().toISOString(),
+    isEdited: false,
+    createdAt: req.body.createdAt || new Date().toISOString(),
   };
 
   db.messages = [...(db.messages || []), newMsg];
-  // Retain last 250 messages
-  if (db.messages.length > 250) {
-    db.messages = db.messages.slice(-250);
+  // Retain last 300 messages
+  if (db.messages.length > 300) {
+    db.messages = db.messages.slice(-300);
   }
   writeDb(db);
   notifyClients({ type: 'NEW_MESSAGE', message: newMsg });
   res.status(201).json(newMsg);
+});
+
+app.put('/api/messages/:id', (req, res) => {
+  const db = readDb();
+  const id = req.params.id;
+  const index = (db.messages || []).findIndex((m: { id: string }) => m.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Message not found' });
+  }
+
+  const { text } = req.body;
+  db.messages[index] = {
+    ...db.messages[index],
+    text: text !== undefined ? text : db.messages[index].text,
+    isEdited: true,
+    editedAt: new Date().toISOString(),
+  };
+  writeDb(db);
+  notifyClients({ type: 'MESSAGE_UPDATED', message: db.messages[index] });
+  res.json(db.messages[index]);
 });
 
 app.delete('/api/messages/:id', (req, res) => {
@@ -306,7 +352,20 @@ app.delete('/api/messages/:id', (req, res) => {
   const id = req.params.id;
   db.messages = (db.messages || []).filter((m: { id: string }) => m.id !== id);
   writeDb(db);
-  res.json({ success: true });
+  notifyClients({ type: 'MESSAGE_DELETED', id });
+  res.json({ success: true, id });
+});
+
+app.post('/api/messages/batch-delete', (req, res) => {
+  const db = readDb();
+  const { ids } = req.body;
+  if (Array.isArray(ids) && ids.length > 0) {
+    const idSet = new Set(ids);
+    db.messages = (db.messages || []).filter((m: { id: string }) => !idSet.has(m.id));
+    writeDb(db);
+    notifyClients({ type: 'MESSAGES_DELETED', ids });
+  }
+  res.json({ success: true, count: ids?.length || 0 });
 });
 
 app.post('/api/messages/clear', (_req, res) => {

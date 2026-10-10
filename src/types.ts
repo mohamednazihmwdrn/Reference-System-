@@ -85,7 +85,19 @@ export interface ChatMessage {
   audioDuration?: number;
   imageUrl?: string | null;
   isWalkieTalkie?: boolean;
+  isEdited?: boolean;
+  editedAt?: string;
   createdAt: string;
+}
+
+export interface TrashItem {
+  id: string;
+  originalId: string;
+  type: 'transfer' | 'branch' | 'bank_account' | 'message';
+  title: string;
+  deletedAt: string; // ISO String
+  deletedBy: string;
+  data: any; // Original object payload for restoration
 }
 
 

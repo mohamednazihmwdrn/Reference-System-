@@ -222,20 +222,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 </button>
               </div>
 
-              {/* Auditor PIN helper button */}
-              {(selectedAccountId === auditorProfile.id || selectedAccountId === 'auditor_main') ? (
-                <div className="flex items-center justify-between p-2 rounded-xl bg-blue-950/60 border border-blue-800 text-[11px] text-blue-200 mt-1">
-                  <span>الرقم السري للمراجع هو: <strong className="font-mono text-amber-300 text-xs">{auditorProfile.pinCode}</strong></span>
-                  <button
-                    type="button"
-                    onClick={() => setPinPassword(auditorProfile.pinCode)}
-                    className="px-2 py-0.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer"
-                  >
-                    تعبئة {auditorProfile.pinCode}
-                  </button>
-                </div>
-              ) : null}
-
               <p className="text-[11px] text-slate-400 pt-0.5">
                 سيتذكر هذا الهاتف تسجيل الدخول تلقائياً ولن يطلب كلمة السر مرة أخرى إلا عند تسجيل الخروج.
               </p>

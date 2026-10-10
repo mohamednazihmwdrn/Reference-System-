@@ -15,6 +15,8 @@ import {
   deleteTransferFromFirestore,
   subscribeToTransfers, 
   sendMessageToFirestore, 
+  deleteMessageFromFirestore,
+  updateMessageInFirestore,
   subscribeToChatMessages, 
   saveBranchToFirestore, 
   subscribeToBranches 
@@ -278,6 +280,62 @@ export async function apiSendMessage(msg: Partial<ChatMessage>): Promise<ChatMes
   } catch (err) {
     console.error('Failed to send message to server:', err);
     return finalMsg;
+  }
+}
+
+export async function apiUpdateMessage(id: string, text: string): Promise<boolean> {
+  // 1. Update in Firestore
+  updateMessageInFirestore(id, { text, isEdited: true, editedAt: new Date().toISOString() }).catch((err) => {
+    console.warn('Firestore message update fallback:', err);
+  });
+
+  // 2. Update on server
+  try {
+    const res = await fetch(`/api/messages/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('Error updating message on server:', err);
+    return true;
+  }
+}
+
+export async function apiDeleteMessage(id: string): Promise<boolean> {
+  // 1. Delete from Firestore immediately so other devices lose it in real-time
+  deleteMessageFromFirestore(id).catch((err) => {
+    console.warn('Firestore message delete fallback:', err);
+  });
+
+  // 2. Delete from server
+  try {
+    const res = await fetch(`/api/messages/${id}`, { method: 'DELETE' });
+    return res.ok;
+  } catch (err) {
+    console.warn('Error deleting message from server:', err);
+    return true;
+  }
+}
+
+export async function apiDeleteMessagesBatch(ids: string[]): Promise<boolean> {
+  // 1. Delete each from Firestore
+  ids.forEach((id) => {
+    deleteMessageFromFirestore(id).catch(() => {});
+  });
+
+  // 2. Delete batch from server
+  try {
+    const res = await fetch('/api/messages/batch-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('Error deleting messages batch on server:', err);
+    return true;
   }
 }
 

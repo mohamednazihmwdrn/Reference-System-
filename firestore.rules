@@ -48,7 +48,9 @@ service cloud.firestore {
         (!('audioDuration' in data) || (data.audioDuration is number && data.audioDuration >= 0)) &&
         (!('isWalkieTalkie' in data) || (data.isWalkieTalkie is bool)) &&
         (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 500000)) &&
-        (!('senderRole' in data) || (data.senderRole is string && data.senderRole.size() <= 100));
+        (!('senderRole' in data) || (data.senderRole is string && data.senderRole.size() <= 100)) &&
+        (!('isEdited' in data) || (data.isEdited is bool)) &&
+        (!('editedAt' in data) || (data.editedAt is string && data.editedAt.size() <= 50));
     }
 
     // Branch Validation
@@ -66,7 +68,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isValidId(transferId) && isValidTransfer(incoming()) && incoming().id == transferId;
       allow update: if isValidId(transferId) && isValidTransfer(incoming()) && incoming().id == transferId;
-      allow delete: if request.auth != null;
+      allow delete: if true;
     }
 
     // Messages and instant Walkie-Talkie broadcasts
@@ -74,7 +76,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isValidId(messageId) && isValidChatMessage(incoming()) && incoming().id == messageId;
       allow update: if isValidId(messageId) && isValidChatMessage(incoming());
-      allow delete: if request.auth != null;
+      allow delete: if true;
     }
 
     // Branches collection
@@ -82,7 +84,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isValidId(branchId) && isValidBranch(incoming()) && incoming().id == branchId;
       allow update: if isValidId(branchId) && isValidBranch(incoming()) && incoming().id == branchId;
-      allow delete: if request.auth != null;
+      allow delete: if true;
     }
 
     // Catch-all deny

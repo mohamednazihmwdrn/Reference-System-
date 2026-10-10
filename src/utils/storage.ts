@@ -1,4 +1,4 @@
-import { TransferItem, Branch, BankAccount, UserSession } from '../types';
+import { TransferItem, Branch, BankAccount, UserSession, TrashItem } from '../types';
 
 const STORAGE_KEYS = {
   TRANSFERS: 'rawda_instapay_transfers_v3',
@@ -9,6 +9,7 @@ const STORAGE_KEYS = {
   SOUND_ENABLED: 'rawda_sound_enabled',
   USER_SESSION: 'rawda_user_session_v3',
   AUDITOR_CREDENTIALS: 'rawda_auditor_credentials_v3',
+  TRASH_ITEMS: 'rawda_trash_items_v1',
 };
 
 export interface AuditorProfile {
@@ -371,3 +372,70 @@ export function importAllDataFromJSON(jsonString: string): boolean {
     return false;
   }
 }
+
+// -------------------------------------------------------------
+// RECYCLE BIN (سلة المحذوفات) - Automatic 15-day purge and manual empty
+// -------------------------------------------------------------
+export const FIFTEEN_DAYS_MS = 15 * 24 * 60 * 60 * 1000;
+
+export function loadTrashItems(): TrashItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.TRASH_ITEMS);
+    if (!raw) return [];
+    const items: TrashItem[] = JSON.parse(raw);
+    if (!Array.isArray(items)) return [];
+
+    const now = Date.now();
+    // Auto-purge items deleted more than 15 days ago
+    const validItems = items.filter((item) => {
+      const deletedTime = new Date(item.deletedAt).getTime();
+      return now - deletedTime < FIFTEEN_DAYS_MS;
+    });
+
+    // Save back if any old items were purged
+    if (validItems.length !== items.length) {
+      saveTrashItems(validItems);
+    }
+    return validItems;
+  } catch (err) {
+    console.error('Failed to load trash items', err);
+    return [];
+  }
+}
+
+export function saveTrashItems(items: TrashItem[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.TRASH_ITEMS, JSON.stringify(items));
+  } catch (err) {
+    console.error('Failed to save trash items', err);
+  }
+}
+
+export function addToTrash(
+  item: Omit<TrashItem, 'id' | 'deletedAt'> & { id?: string; deletedAt?: string }
+): TrashItem {
+  const current = loadTrashItems();
+  const newItem: TrashItem = {
+    ...item,
+    id: item.id || `trash_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    deletedAt: item.deletedAt || new Date().toISOString(),
+  };
+  const updated = [newItem, ...current];
+  saveTrashItems(updated);
+  return newItem;
+}
+
+export function clearTrash(): void {
+  if (typeof window === 'undefined') return;
+  saveTrashItems([]);
+}
+
+export function removeTrashItem(id: string): TrashItem[] {
+  const current = loadTrashItems();
+  const updated = current.filter((item) => item.id !== id);
+  saveTrashItems(updated);
+  return updated;
+}
+

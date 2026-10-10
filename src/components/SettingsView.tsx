@@ -38,7 +38,7 @@ import {
   Cloud,
   Database
 } from 'lucide-react';
-import { Branch, BankAccount, TransferItem } from '../types';
+import { Branch, BankAccount, TransferItem, TrashItem } from '../types';
 import { 
   exportAllDataAsJSON, 
   importAllDataFromJSON, 
@@ -46,7 +46,13 @@ import {
   COMPANY_INFO,
   AuditorProfile,
   loadAuditorCredentials,
-  saveAuditorCredentials
+  saveAuditorCredentials,
+  loadTrashItems,
+  saveTrashItems,
+  addToTrash,
+  clearTrash,
+  removeTrashItem,
+  FIFTEEN_DAYS_MS
 } from '../utils/storage';
 import { apiUpdateAuditor } from '../utils/api';
 
@@ -59,6 +65,7 @@ interface SettingsViewProps {
   onDataReset: () => void;
   onGoToDashboard?: () => void;
   onClearAllTransfers?: () => void;
+  onRestoreTransfer?: (transfer: TransferItem) => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -70,11 +77,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onDataReset,
   onGoToDashboard,
   onClearAllTransfers,
+  onRestoreTransfer,
 }) => {
   // Navigation / Filter inside Settings
-  const [activeTab, setActiveTab] = useState<'branches' | 'banks' | 'backup' | 'storage'>('branches');
+  const [activeTab, setActiveTab] = useState<'branches' | 'banks' | 'backup' | 'storage' | 'trash'>('branches');
   const [branchFilter, setBranchFilter] = useState<'all' | 'store' | 'warehouse' | 'auditor' | 'inactive'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Recycle Bin (سلة المحذوفات) State
+  const [trashItems, setTrashItems] = useState<TrashItem[]>(() => loadTrashItems());
+  const [trashFilter, setTrashFilter] = useState<'all' | 'transfer' | 'branch' | 'bank_account' | 'message'>('all');
 
   // Auditor account profile state & modal
   const [auditorProfile, setAuditorProfile] = useState<AuditorProfile>(loadAuditorCredentials());
@@ -287,13 +299,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setEditingBranch(null);
   };
 
-  // 3. DELETE BRANCH HANDLER
+  // 3. DELETE BRANCH HANDLER (Moves to Recycle Bin)
   const handleConfirmDeleteBranch = () => {
     if (!deletingBranch) return;
 
+    addToTrash({
+      originalId: deletingBranch.id,
+      type: 'branch',
+      title: `فرع / مخزن: ${deletingBranch.name} (${deletingBranch.code})`,
+      deletedBy: 'المراجع المالي',
+      data: deletingBranch,
+    });
+    setTrashItems(loadTrashItems());
+
     const updated = branches.filter((b) => b.id !== deletingBranch.id);
     onUpdateBranches(updated);
-    triggerToast(`تم حذف (${deletingBranch.name}) نهائياً من المنظومة وحسابات الدخول 🗑️`);
+    triggerToast(`تم نقل (${deletingBranch.name}) إلى سلة المحذوفات بنجاح 🗑️`);
     setDeletingBranch(null);
   };
 
@@ -346,10 +367,50 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleDeleteBank = (id: string, name: string) => {
-    if (confirm(`هل أنت متأكد من حذف الحساب البنكي (${name})؟`)) {
+    const acc = bankAccounts.find((b) => b.id === id);
+    if (confirm(`هل أنت متأكد من حذف الحساب البنكي (${name}) ونقله لسلة المحذوفات؟`)) {
+      if (acc) {
+        addToTrash({
+          originalId: acc.id,
+          type: 'bank_account',
+          title: `حساب بنكي: ${acc.bankName} - ${acc.accountName} (${acc.accountNumber})`,
+          deletedBy: 'المراجع المالي',
+          data: acc,
+        });
+        setTrashItems(loadTrashItems());
+      }
       onUpdateBankAccounts(bankAccounts.filter((b) => b.id !== id));
-      triggerToast(`تم حذف الحساب البنكي (${name}) بنجاح`);
+      triggerToast(`تم نقل الحساب البنكي (${name}) لسلة المحذوفات 🗑️`);
     }
+  };
+
+  // 7. RECYCLE BIN ACTIONS
+  const handleRestoreTrashItem = (item: TrashItem) => {
+    if (item.type === 'transfer' && onRestoreTransfer) {
+      onRestoreTransfer(item.data);
+    } else if (item.type === 'branch') {
+      onUpdateBranches([...branches, item.data]);
+    } else if (item.type === 'bank_account') {
+      onUpdateBankAccounts([...bankAccounts, item.data]);
+    }
+    const updated = removeTrashItem(item.id);
+    setTrashItems(updated);
+    triggerToast(`تمت استعادة (${item.title}) إلى المنظومة بنجاح ↩️`);
+  };
+
+  const handlePermanentDeleteTrashItem = (item: TrashItem) => {
+    if (!confirm(`هل أنت متأكد من الحذف النهائي لـ "${item.title}"؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
+    const updated = removeTrashItem(item.id);
+    setTrashItems(updated);
+    triggerToast(`تم حذف (${item.title}) نهائياً ❌`);
+  };
+
+  const handleEmptyTrash = () => {
+    if (trashItems.length === 0) return;
+    if (!confirm(`هل أنت متأكد من تفريغ سلة المحذوفات بالكامل وحذف كافة الـ (${trashItems.length}) عناصر نهائياً؟`)) return;
+    clearTrash();
+    setTrashItems([]);
+    triggerToast('تم تفريغ سلة المحذوفات بالكامل 🗑️');
   };
 
   const handleToggleBankActive = (id: string) => {
@@ -571,7 +632,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           }`}
         >
           <HardDrive className="w-4 h-4 text-emerald-400" />
-          <span>سعة الصور (1,000,000+)</span>
+          <span>سعة الصور (1M+)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('trash')}
+          className={`py-2.5 px-3 sm:px-4 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 relative ${
+            activeTab === 'trash'
+              ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Trash2 className="w-4 h-4 text-red-500" />
+          <span>سلة المحذوفات ({trashItems.length})</span>
+          {trashItems.length > 0 && (
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          )}
         </button>
       </div>
 
@@ -1391,6 +1468,187 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* SECTION 5: RECYCLE BIN / TRASH (سلة المحذوفات - تفريغ تلقائي 15 يوم ويدوي) */}
+      {/* ========================================================================= */}
+      {activeTab === 'trash' && (
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xs space-y-5 text-right">
+          
+          {/* Header & Controls */}
+          <div className="pb-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 font-black text-base text-slate-900">
+                <div className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <span>سلة المحذوفات والمهملات ({trashItems.length})</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                يتم نقل كافة عمليات التحويل والحسابات والفروع المحذوفة بواسطة المراجع إلى هذه السلة. 
+                يتم تفريغ العناصر تلقائياً بعد مرور <b>15 يوماً</b> من تاريخ الحذف، أو يمكنك استعادتها وتفريغ السلة يدوياً الآن.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                disabled={trashItems.length === 0}
+                onClick={handleEmptyTrash}
+                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>تفريغ السلة يدوياً</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Auto-Purge Security Notice */}
+          <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 text-xs text-amber-900 flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+            <span>
+              <b>نظام الحماية المزدوجة:</b> تُحفظ العناصر المحذوفة لمدة 15 يوماً كمهلة أمان لتفادي أخطاء الحذف العفوي. بعد انتهاء الـ 15 يوماً يتم تنظيف وتفريغ العنصر نهائياً وبشكل تلقائي.
+            </span>
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1.5 pb-1">
+            <button
+              type="button"
+              onClick={() => setTrashFilter('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                trashFilter === 'all'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+              }`}
+            >
+              كافة العناصر ({trashItems.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTrashFilter('transfer')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                trashFilter === 'transfer'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+              }`}
+            >
+              عمليات التحويل ({trashItems.filter((i) => i.type === 'transfer').length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTrashFilter('branch')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                trashFilter === 'branch'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+              }`}
+            >
+              الفروع والمخازن ({trashItems.filter((i) => i.type === 'branch').length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTrashFilter('bank_account')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                trashFilter === 'bank_account'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+              }`}
+            >
+              الحسابات البنكية ({trashItems.filter((i) => i.type === 'bank_account').length})
+            </button>
+          </div>
+
+          {/* Items List */}
+          {trashItems.length === 0 ? (
+            <div className="text-center py-12 space-y-2 text-slate-400 bg-slate-50/70 rounded-3xl border border-dashed border-slate-200">
+              <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                <Trash2 className="w-6 h-6 stroke-[1.5]" />
+              </div>
+              <div className="font-bold text-slate-700 text-sm">سلة المحذوفات فارغة حالياً</div>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                عند قيام المراجع بحذف أي عملية تحويل أو فرع أو حساب بنكي، سيتم نقله إلى هنا تلقائياً ليكون متاحاً للاستعادة.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {trashItems
+                .filter((item) => trashFilter === 'all' || item.type === trashFilter)
+                .map((item) => {
+                  const deletedDate = new Date(item.deletedAt);
+                  const daysElapsed = (Date.now() - deletedDate.getTime()) / (24 * 60 * 60 * 1000);
+                  const daysRemaining = Math.max(0, Math.ceil(15 - daysElapsed));
+
+                  const typeLabel = 
+                    item.type === 'transfer' ? 'عملية تحويل' :
+                    item.type === 'branch' ? 'فرع / مخزن' :
+                    item.type === 'bank_account' ? 'حساب بنكي' : 'رسالة';
+
+                  const typeBadgeClass =
+                    item.type === 'transfer' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                    item.type === 'branch' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                    item.type === 'bank_account' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
+                    'bg-slate-100 text-slate-700 border-slate-200';
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-3 transition-all hover:shadow-xs hover:border-slate-300"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${typeBadgeClass}`}>
+                            {typeLabel}
+                          </span>
+                          <span className="text-[11px] font-bold text-slate-400 font-mono">
+                            {deletedDate.toLocaleDateString('ar-EG', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+
+                        <span className="text-[10px] font-bold font-mono text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                          متبقي {daysRemaining} يوم
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="font-bold text-xs sm:text-sm text-slate-900 leading-tight">
+                          {item.title}
+                        </h4>
+                        <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-2">
+                          <span>حُذفت بواسطة: <b>{item.deletedBy}</b></span>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons: Restore or Delete Permanently */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-slate-200/80">
+                        <button
+                          type="button"
+                          onClick={() => handleRestoreTrashItem(item)}
+                          className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>استعادة للمنظومة</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handlePermanentDeleteTrashItem(item)}
+                          className="py-1.5 px-3 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                          title="حذف نهائي فوري"
+                        >
+                          <span>حذف نهائي</span>
+                        </button>
+                      </div>
+
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+
+        </div>
+      )}
+
       {showAddBranchModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-in fade-in duration-200 text-right my-auto">

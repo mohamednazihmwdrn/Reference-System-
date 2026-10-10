@@ -10,7 +10,8 @@ import {
   orderBy, 
   limit, 
   getDocFromServer,
-  deleteDoc 
+  deleteDoc,
+  updateDoc 
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { TransferItem, ChatMessage, Branch } from '../types';
@@ -184,6 +185,32 @@ export async function sendMessageToFirestore(msg: ChatMessage): Promise<void> {
     await setDoc(docRef, cleanMsg, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+/**
+ * Permanently delete a chat message from Firestore so it disappears for all devices
+ */
+export async function deleteMessageFromFirestore(id: string): Promise<void> {
+  const path = `messages/${id}`;
+  try {
+    const docRef = doc(db, 'messages', id);
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+/**
+ * Update a chat message in Firestore (e.g. edit text)
+ */
+export async function updateMessageInFirestore(id: string, updates: Partial<ChatMessage>): Promise<void> {
+  const path = `messages/${id}`;
+  try {
+    const docRef = doc(db, 'messages', id);
+    await updateDoc(docRef, updates);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
   }
 }
 

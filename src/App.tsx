@@ -34,7 +34,9 @@ import {
   getSoundEnabled,
   setSoundEnabled,
   COMPANY_INFO,
+  addToTrash,
 } from './utils/storage';
+import { saveTransferToFirestore } from './utils/firebase';
 import {
   apiFetchTransfers,
   apiCreateTransfer,
@@ -460,14 +462,33 @@ export default function App() {
     }
   };
 
-  // Reviewer deletes a transfer (if sent by mistake)
+  // Reviewer deletes a transfer (Moves to Recycle Bin)
   const handleDeleteTransfer = async (transferId: string) => {
+    const itemToDelete = transfers.find((t) => t.id === transferId);
+    if (itemToDelete) {
+      addToTrash({
+        originalId: itemToDelete.id,
+        type: 'transfer',
+        title: `تحويل بمبلغ ${itemToDelete.amount.toLocaleString('ar-EG')} ج.م - ${itemToDelete.branchName} (فاتورة #${itemToDelete.invoiceNo})`,
+        deletedBy: currentSession?.userName || 'المراجع المالي',
+        data: itemToDelete,
+      });
+    }
+
     setTransfers((prev) => prev.filter((t) => t.id !== transferId));
     if (inspectingTransfer?.id === transferId) {
       setInspectingTransfer(null);
     }
     await apiDeleteTransfer(transferId);
     soundManager.playReject();
+  };
+
+  // Restore transfer from Recycle Bin
+  const handleRestoreTransfer = (restoredTransfer: TransferItem) => {
+    setTransfers((prev) => [restoredTransfer, ...prev]);
+    saveTransfers([restoredTransfer, ...transfers]);
+    saveTransferToFirestore(restoredTransfer);
+    soundManager.playSuccess();
   };
 
   // Branches Management Handlers (Reviewer / Admin)
@@ -710,6 +731,7 @@ export default function App() {
             onDataReset={handleDataReset}
             onGoToDashboard={() => handleTabChange('dashboard')}
             onClearAllTransfers={handleClearAllTransfers}
+            onRestoreTransfer={handleRestoreTransfer}
           />
         )}
 
